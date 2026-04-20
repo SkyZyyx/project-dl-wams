@@ -7,6 +7,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+    - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wams}"]
       interval: 5s
@@ -25,7 +27,7 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${MAIN_DJANGO_SECRET_KEY:-dev-main-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,main_service,nginx}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,main_service,nginx}
       POSTGRES_DB: ${POSTGRES_DB:-wams}
       POSTGRES_USER: ${POSTGRES_USER:-wams}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
@@ -52,7 +54,7 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${SEARCH_DJANGO_SECRET_KEY:-dev-search-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,search_service,nginx}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,search_service,nginx}
       POSTGRES_DB: ${POSTGRES_DB:-wams}
       POSTGRES_USER: ${POSTGRES_USER:-wams}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}

@@ -1,0 +1,30 @@
+{% extends "users/base.html" %}
+
+{% block title %}Auth Landing{% endblock %}
+
+{% block content %}
+<h1>Authentication demo</h1>
+<p class="subtext">Minimal interface for registration, login, and profile retrieval using the existing API endpoints.</p>
+
+<div class="actions">
+    <a class="button" href="/auth/register/">Create account</a>
+    <a class="button secondary" href="/auth/login/">Sign in</a>
+    <a class="button secondary" href="/auth/profile/">Open profile</a>
+</div>
+
+<div class="status" id="token-status">Checking token status...</div>
+
+<script>
+    (function () {
+        var key = "auth_access_token";
+        var status = document.getElementById("token-status");
+        var token = localStorage.getItem(key);
+        if (token) {
+            status.classList.add("success");
+            status.textContent = "Access token is currently stored in localStorage. Visit profile to load user data.";
+            return;
+        }
+        status.textContent = "No local token detected. Register or log in to begin.";
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "users/base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<h1>Sign in</h1>
+<p class="subtext">This form calls <code>POST /api/auth/login/</code> and stores the returned access token in localStorage.</p>
+
+<form id="login-form" class="stack">
+    <div>
+        <label for="username">Username</label>
+        <input id="username" name="username" required>
+    </div>
+    <div>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" required>
+    </div>
+    <div class="actions">
+        <button class="button" type="submit">Login</button>
+        <a class="button secondary" href="/auth/register/">Need an account?</a>
+    </div>
+</form>
+
+<div class="status" id="login-status">Idle</div>
+
+<script>
+    var tokenKey = "auth_access_token";
+    document.getElementById("login-form").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var status = document.getElementById("login-status");
+        status.className = "status";
+        status.textContent = "Signing in...";
+
+        var formData = new FormData(event.currentTarget);
+        var payload = {
+            username: formData.get("username"),
+            password: formData.get("password")
+        };
+
+        try {
+            var response = await fetch("/api/auth/login/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            var data = await response.json();
+
+            if (!response.ok) {
+                status.classList.add("error");
+                status.textContent = "Login failed: " + JSON.stringify(data, null, 2);
+                return;
+            }
+
+            localStorage.setItem(tokenKey, data.access || "");
+            status.classList.add("success");
+            status.textContent = "Login successful. Access token stored. Open profile to validate auth.";
+        } catch (error) {
+            status.classList.add("error");
+            status.textContent = "Request failed: " + error.message;
+        }
+    });
+</script>
+{% endblock %}

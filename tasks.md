@@ -10,17 +10,17 @@ Legend: [ ] todo, [x] done
 - [x] Verify stack boots end-to-end
 
 ## M1 Users + Auth
-- [ ] Create `users` app
-- [ ] Add basic JWT auth
-- [ ] Add registration, login, profile endpoints
-- [ ] Protect user and order actions
+- [x] Create `users` app
+- [x] Add basic JWT auth
+- [x] Add registration, login, profile endpoints
+- [x] Protect user and order actions
 
 ## M2 Catalog + Media
-- [ ] Create `Category`, `Product`, `ProductImage` models + migrations
-- [ ] Add category and product CRUD endpoints
-- [ ] Save uploads to `MEDIA_ROOT`
-- [ ] Generate and store `thumbnail_b64` on image upload
-- [ ] Return images and `thumbnail_b64` in product responses
+- [x] Create `Category`, `Product`, `ProductImage` models + migrations
+- [x] Add category and product CRUD endpoints
+- [x] Save uploads to `MEDIA_ROOT`
+- [x] Generate and store `thumbnail_b64` on image upload
+- [x] Return images and `thumbnail_b64` in product responses
 
 ## M3 Orders
 - [ ] Create `Order` and `OrderItem` models + migrations

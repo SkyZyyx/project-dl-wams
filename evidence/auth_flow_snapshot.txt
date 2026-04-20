@@ -1,0 +1,11 @@
+uid=2_0 RootWebArea "Auth Flow Verification" url="http://localhost:8080/api/health/"
+  uid=2_1 StaticText "Auth flow verification
+register: 201
+login: 200
+profile without token: 401
+profile with token: 200
+
+Endpoints:
+POST /api/auth/register/
+POST /api/auth/login/
+GET /api/auth/profile/"

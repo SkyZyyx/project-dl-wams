@@ -1,0 +1,76 @@
+{% extends "users/base.html" %}
+
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<h1>Create your account</h1>
+<p class="subtext">This form sends data to <code>POST /api/auth/register/</code>.</p>
+
+<form id="register-form" class="stack">
+    <div>
+        <label for="username">Username</label>
+        <input id="username" name="username" required>
+    </div>
+    <div>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required>
+    </div>
+    <div>
+        <label for="first_name">First name</label>
+        <input id="first_name" name="first_name">
+    </div>
+    <div>
+        <label for="last_name">Last name</label>
+        <input id="last_name" name="last_name">
+    </div>
+    <div>
+        <label for="password">Password (8+ chars)</label>
+        <input id="password" name="password" type="password" minlength="8" required>
+    </div>
+    <div class="actions">
+        <button class="button" type="submit">Register</button>
+        <a class="button secondary" href="/auth/login/">Go to login</a>
+    </div>
+</form>
+
+<div class="status" id="register-status">Idle</div>
+
+<script>
+    document.getElementById("register-form").addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var status = document.getElementById("register-status");
+        status.className = "status";
+        status.textContent = "Submitting...";
+
+        var formData = new FormData(event.currentTarget);
+        var payload = {
+            username: formData.get("username"),
+            email: formData.get("email"),
+            first_name: formData.get("first_name"),
+            last_name: formData.get("last_name"),
+            password: formData.get("password")
+        };
+
+        try {
+            var response = await fetch("/api/auth/register/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            var data = await response.json();
+            if (!response.ok) {
+                status.classList.add("error");
+                status.textContent = "Registration failed: " + JSON.stringify(data, null, 2);
+                return;
+            }
+
+            status.classList.add("success");
+            status.textContent = "Registration succeeded (HTTP " + response.status + "). You can now log in.";
+        } catch (error) {
+            status.classList.add("error");
+            status.textContent = "Request failed: " + error.message;
+        }
+    });
+</script>
+{% endblock %}

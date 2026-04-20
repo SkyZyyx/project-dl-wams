@@ -1,0 +1,67 @@
+{% extends "users/base.html" %}
+
+{% block title %}Profile{% endblock %}
+
+{% block content %}
+<h1>Your profile</h1>
+<p class="subtext">Uses <code>GET /api/auth/profile/</code> with <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+
+<div class="actions">
+    <button class="button" id="load-profile" type="button">Load profile</button>
+    <button class="button secondary" id="logout" type="button">Logout</button>
+    <a class="button secondary" href="/auth/login/">Back to login</a>
+</div>
+
+<div class="status" id="profile-status">Idle</div>
+
+<script>
+    var tokenKey = "auth_access_token";
+    var statusEl = document.getElementById("profile-status");
+
+    function showStatus(message, level) {
+        statusEl.className = "status";
+        if (level) {
+            statusEl.classList.add(level);
+        }
+        statusEl.textContent = message;
+    }
+
+    async function loadProfile() {
+        var token = localStorage.getItem(tokenKey);
+        if (!token) {
+            showStatus("Unauthorized: no local access token found.", "error");
+            return;
+        }
+
+        showStatus("Loading profile...");
+
+        try {
+            var response = await fetch("/api/auth/profile/", {
+                method: "GET",
+                headers: {
+                    Authorization: "Bearer " + token
+                }
+            });
+            var data = await response.json();
+
+            if (!response.ok) {
+                showStatus("Request failed (HTTP " + response.status + "): " + JSON.stringify(data, null, 2), "error");
+                return;
+            }
+
+            statusEl.className = "status success";
+            statusEl.innerHTML = "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+        } catch (error) {
+            showStatus("Request failed: " + error.message, "error");
+        }
+    }
+
+    document.getElementById("load-profile").addEventListener("click", loadProfile);
+    document.getElementById("logout").addEventListener("click", function () {
+        localStorage.removeItem(tokenKey);
+        showStatus("Logged out locally. Token removed.", "success");
+    });
+
+    loadProfile();
+</script>
+{% endblock %}
