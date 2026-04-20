@@ -23,10 +23,10 @@ Legend: [ ] todo, [x] done
 - [x] Return images and `thumbnail_b64` in product responses
 
 ## M3 Orders
-- [ ] Create `Order` and `OrderItem` models + migrations
-- [ ] Add order create, list, detail endpoints
-- [ ] Link orders to authenticated users
-- [ ] Snapshot product price on order create
+- [x] Create `Order` and `OrderItem` models + migrations
+- [x] Add order create, list, detail endpoints
+- [x] Link orders to authenticated users
+- [x] Snapshot product price on order create
 
 ## M4 Search Core
 - [ ] Add DINOv2 embedder singleton
