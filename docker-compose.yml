@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wams}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wams}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.5
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  main_service:
+    build:
+      context: ./main_service
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    environment:
+      DJANGO_SECRET_KEY: ${MAIN_DJANGO_SECRET_KEY:-dev-main-secret}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,main_service,nginx}
+      POSTGRES_DB: ${POSTGRES_DB:-wams}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL:-http://search_service:8001}
+      MEDIA_ROOT: /app/media
+      MEDIA_URL: /media/
+    volumes:
+      - ./main_service:/app
+      - media_data:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      search_service:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  search_service:
+    build:
+      context: ./search_service
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8001"
+    environment:
+      DJANGO_SECRET_KEY: ${SEARCH_DJANGO_SECRET_KEY:-dev-search-secret}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,search_service,nginx}
+      POSTGRES_DB: ${POSTGRES_DB:-wams}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      MAIN_SERVICE_URL: ${MAIN_SERVICE_URL:-http://main_service:8000}
+      MEDIA_ROOT: /app/media
+      MEDIA_URL: /media/
+    volumes:
+      - ./search_service:/app
+      - media_data:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    ports:
+      - "8001:8001"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - main_service
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - media_data:/media:ro
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  media_data:
