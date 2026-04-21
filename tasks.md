@@ -38,11 +38,11 @@ Legend: [ ] todo, [x] done
 - [x] Smoke test index and search flow
 
 ## M5 Main Search Proxy
-- [ ] Implement main `POST /api/search/` proxy to `search_service`
-- [ ] Hydrate matched products from DB
-- [ ] Attach similarity scores and sort descending
-- [ ] Auto-index on `ProductImage` create
-- [ ] Remove vectors on product or image delete
+- [x] Implement main `POST /api/search/` proxy to `search_service`
+- [x] Hydrate matched products from DB
+- [x] Attach similarity scores and sort descending
+- [x] Auto-index on `ProductImage` create
+- [x] Remove vectors on product or image delete
 
 ## M6 Search Preprocessing
 - [ ] Add object detection crop before embedding

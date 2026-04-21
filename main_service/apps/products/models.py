@@ -61,7 +61,7 @@ class ProductImage(models.Model):
     thumbnail_b64 = models.TextField(blank=True)
     is_primary = models.BooleanField(default=False)
     indexed = models.BooleanField(default=False)
-    qdrant_id = models.UUIDField(null=True, blank=True)
+    qdrant_id = models.CharField(max_length=255, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from functools import lru_cache
 import json
 from urllib import error as urllib_error
-from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 from uuid import uuid4
 

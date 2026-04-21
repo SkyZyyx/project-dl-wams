@@ -1,6 +1,5 @@
 from django.db import connection
-from django.shortcuts import get_object_or_404
-from rest_framework import status
+from rest_framework import permissions, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,6 +24,8 @@ def health(request):
 
 
 class SearchView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         image = request.FILES.get("image")
         if image is None:

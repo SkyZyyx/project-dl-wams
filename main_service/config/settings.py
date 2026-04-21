@@ -61,11 +61,8 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "test.sqlite3",
-    }
+DATABASES = (
+    {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "test.sqlite3"}}
     if os.getenv("DJANGO_USE_SQLITE", "0") == "1"
     else {
         "default": {
@@ -77,7 +74,7 @@ DATABASES = {
             "PORT": os.getenv("POSTGRES_PORT", "5432"),
         }
     }
-}
+)
 
 AUTH_PASSWORD_VALIDATORS = []
 
