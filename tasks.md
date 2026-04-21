@@ -28,14 +28,14 @@ Legend: [ ] todo, [x] done
 - [x] Link orders to authenticated users
 - [x] Snapshot product price on order create
 
-## M4 Search Core
-- [ ] Add DINOv2 embedder singleton
-- [ ] Add image quality check
-- [ ] Add Qdrant collection setup, upsert, search, delete helpers
-- [ ] Implement `POST /api/index/`
-- [ ] Implement `POST /api/search/`
-- [ ] Implement `DELETE /api/index/<product_id>/`
-- [ ] Smoke test index and search flow
+## M4 Search Core (complete)
+- [x] Add DINOv2 embedder singleton
+- [x] Add image quality check
+- [x] Add Qdrant collection setup, upsert, search, delete helpers
+- [x] Implement `POST /api/index/`
+- [x] Implement `POST /api/search/`
+- [x] Implement `DELETE /api/index/<product_id>/`
+- [x] Smoke test index and search flow
 
 ## M5 Main Search Proxy
 - [ ] Implement main `POST /api/search/` proxy to `search_service`

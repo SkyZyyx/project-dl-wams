@@ -26,7 +26,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.core",
     "apps.users",
-    "apps.products",
+    "apps.products.apps.ProductsConfig",
     "apps.orders",
 ]
 
@@ -63,12 +63,19 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "wams"),
-        "USER": os.getenv("POSTGRES_USER", "wams"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "wams"),
-        "HOST": os.getenv("POSTGRES_HOST", "postgres"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "test.sqlite3",
+    }
+    if os.getenv("DJANGO_USE_SQLITE", "0") == "1"
+    else {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "wams"),
+            "USER": os.getenv("POSTGRES_USER", "wams"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", "wams"),
+            "HOST": os.getenv("POSTGRES_HOST", "postgres"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        }
     }
 }
 
@@ -82,6 +89,7 @@ USE_TZ = True
 STATIC_URL = "static/"
 MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
+SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://search_service:8001")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

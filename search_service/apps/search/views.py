@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import IndexRequestSerializer, SearchMatchSerializer, SearchRequestSerializer
-from .services.embedder import DINOv2Embedder
+from .services.embedder import get_embedder
 from .services.qdrant import delete_by_product_id, search_vectors, upsert_vector
 from .services.quality import validate_image_quality
 
@@ -26,8 +26,8 @@ class IndexView(APIView):
 
         product_id = serializer.validated_data["product_id"]
         product_image_id = serializer.validated_data.get("product_image_id")
-        vector_id = str(product_image_id or uuid4())
-        vector = DINOv2Embedder().embed(image_bytes)
+        vector_id = product_image_id if product_image_id is not None else str(uuid4())
+        vector = get_embedder().embed(image_bytes)
         upsert_vector(
             vector_id=vector_id,
             vector=vector,
@@ -61,7 +61,7 @@ class SearchView(APIView):
         if not ok:
             return Response({"detail": reason}, status=status.HTTP_400_BAD_REQUEST)
 
-        vector = DINOv2Embedder().embed(image_bytes)
+        vector = get_embedder().embed(image_bytes)
         results = search_vectors(
             vector=vector,
             limit=serializer.validated_data["limit"],
@@ -85,7 +85,5 @@ class SearchView(APIView):
 
 class DeleteIndexView(APIView):
     def delete(self, request, product_id: int):
-        removed = delete_by_product_id(product_id)
-        if removed == 0:
-            return Response({"status": "deleted", "product_id": product_id}, status=status.HTTP_200_OK)
+        delete_by_product_id(product_id)
         return Response({"status": "deleted", "product_id": product_id}, status=status.HTTP_200_OK)

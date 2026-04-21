@@ -15,6 +15,6 @@ class SearchRequestSerializer(serializers.Serializer):
 
 class SearchMatchSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
-    product_image_id = serializers.IntegerField(allow_null=True)
+    product_image_id = serializers.IntegerField(required=False, allow_null=True)
     qdrant_id = serializers.CharField()
     score = serializers.FloatField()

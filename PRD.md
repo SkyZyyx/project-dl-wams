@@ -610,3 +610,4 @@ python-dotenv
 | Quality gate before indexing | Prevents blurry/dark images degrading search quality |
 | Qdrant payload stores `product_id` only | Keeps Qdrant lean; full product data always fetched from Postgres |
 | Single `docker-compose.yml` | Simpler for uni demo; split to separate compose files for "production" |
+ALWAYS MARK THE TASKS AS DONE IN tasks.md IF YOU FINISHED THE TASK (THE MILESTONE ENTIRELY)
