@@ -45,19 +45,19 @@ Legend: [ ] todo, [x] done
 - [x] Remove vectors on product or image delete
 
 ## M6 Search Preprocessing
-- [ ] Add object detection crop before embedding
-- [ ] Add optional `rembg` background removal
-- [ ] Fallback to full image when no object detected
-- [ ] Re-test search quality
+- [x] Add object detection crop before embedding
+- [x] Add optional `rembg` background removal
+- [x] Fallback to full image when no object detected
+- [x] Re-test search quality
 
 ## M7 OOD Filter
-- [ ] Compute indexed collection mean vector
-- [ ] Reject far query vectors by cosine threshold
-- [ ] Return clear `no similar products found` response
-- [ ] Tune threshold with sample queries
+- [x] Compute indexed collection mean vector
+- [x] Reject far query vectors by cosine threshold
+- [x] Return clear `no similar products found` response
+- [x] Tune threshold with sample queries
 
 ## M8 Admin + Demo Polish
-- [ ] Add admin bulk-index action or page
-- [ ] Add Grad-CAM heatmap overlay
-- [ ] Add confidence threshold control in frontend
-- [ ] Run final demo smoke test
+- [x] Add admin bulk-index action or page
+- [x] Add Grad-CAM heatmap overlay
+- [x] Add confidence threshold control in frontend
+- [x] Run final demo smoke test

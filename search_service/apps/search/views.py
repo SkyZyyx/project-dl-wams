@@ -7,8 +7,16 @@ from rest_framework.views import APIView
 
 from .serializers import IndexRequestSerializer, SearchMatchSerializer, SearchRequestSerializer
 from .services.embedder import get_embedder
-from .services.qdrant import delete_by_product_id, search_vectors, upsert_vector
+from .services.preprocess import preprocess_image_bytes
+from .services.qdrant import (
+    delete_by_product_id,
+    is_query_vector_out_of_distribution,
+    is_top_hit_below_ood_threshold,
+    search_vectors,
+    upsert_vector,
+)
 from .services.quality import validate_image_quality
+from .services.visualization import generate_gradcam_overlay
 
 
 class IndexView(APIView):
@@ -27,7 +35,8 @@ class IndexView(APIView):
         product_id = serializer.validated_data["product_id"]
         product_image_id = serializer.validated_data.get("product_image_id")
         vector_id = product_image_id if product_image_id is not None else str(uuid4())
-        vector = get_embedder().embed(image_bytes)
+        embedding_bytes = preprocess_image_bytes(image_bytes)
+        vector = get_embedder().embed(embedding_bytes)
         upsert_vector(
             vector_id=vector_id,
             vector=vector,
@@ -61,12 +70,20 @@ class SearchView(APIView):
         if not ok:
             return Response({"detail": reason}, status=status.HTTP_400_BAD_REQUEST)
 
-        vector = get_embedder().embed(image_bytes)
+        embedding_bytes = preprocess_image_bytes(image_bytes)
+        vector = get_embedder().embed(embedding_bytes)
+        if is_query_vector_out_of_distribution(vector=vector):
+            return Response({"detail": "no similar products found", "matches": []}, status=status.HTTP_200_OK)
+
         results = search_vectors(
             vector=vector,
             limit=serializer.validated_data["limit"],
             score_threshold=serializer.validated_data.get("score_threshold"),
         )
+
+        # Keep a conservative floor for weak nearest-neighbor hits.
+        if is_top_hit_below_ood_threshold(results=results):
+            return Response({"detail": "no similar products found", "matches": []}, status=status.HTTP_200_OK)
 
         matches = []
         for result in results:
@@ -87,3 +104,22 @@ class DeleteIndexView(APIView):
     def delete(self, request, product_id: int):
         delete_by_product_id(product_id)
         return Response({"status": "deleted", "product_id": product_id}, status=status.HTTP_200_OK)
+
+
+class GradCamView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        image_file = request.FILES.get("image")
+        if image_file is None:
+            return Response({"image": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        image_bytes = image_file.read()
+        ok, reason = validate_image_quality(image_bytes)
+        if not ok:
+            return Response({"detail": reason}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            return Response(generate_gradcam_overlay(image_bytes))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

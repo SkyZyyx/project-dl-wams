@@ -1,5 +1,6 @@
 from functools import lru_cache
 import json
+import math
 from types import SimpleNamespace
 from urllib import request as urllib_request
 
@@ -41,6 +42,80 @@ def ensure_collection() -> None:
     )
 
 
+def _normalize_vector(vector: list[float]) -> list[float]:
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        return list(vector)
+    return [value / norm for value in vector]
+
+
+@lru_cache(maxsize=1)
+def get_collection_mean_vector() -> list[float] | None:
+    ensure_collection()
+    client = get_client()
+    total: list[float] | None = None
+    count = 0
+    offset = None
+
+    while True:
+        points, offset = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=getattr(settings, "SEARCH_COLLECTION_SCROLL_LIMIT", 256),
+            offset=offset,
+            with_vectors=True,
+            with_payload=False,
+        )
+
+        if not points:
+            break
+
+        for point in points:
+            vector = getattr(point, "vector", None)
+            if isinstance(vector, dict):
+                vector = next(iter(vector.values()), None)
+            if not vector:
+                continue
+
+            if total is None:
+                total = [0.0] * len(vector)
+
+            if len(vector) != len(total):
+                continue
+
+            for index, value in enumerate(vector):
+                total[index] += float(value)
+            count += 1
+
+        if offset is None:
+            break
+
+    if total is None or count == 0:
+        return None
+
+    return _normalize_vector([value / count for value in total])
+
+
+def is_query_vector_out_of_distribution(*, vector: list[float]) -> bool:
+    mean_vector = get_collection_mean_vector()
+    if mean_vector is None:
+        return False
+
+    normalized_vector = _normalize_vector(vector)
+    if len(normalized_vector) != len(mean_vector):
+        return False
+
+    cosine_similarity = sum(left * right for left, right in zip(normalized_vector, mean_vector))
+    return cosine_similarity < getattr(settings, "SEARCH_OOD_COSINE_THRESHOLD", 0.35)
+
+
+def is_top_hit_below_ood_threshold(*, results) -> bool:
+    if not results:
+        return True
+
+    top_score = max(float(getattr(result, "score", 0.0)) for result in results)
+    return top_score < getattr(settings, "SEARCH_OOD_TOP_SCORE_THRESHOLD", 0.45)
+
+
 def upsert_vector(*, vector_id: int | str, vector: list[float], payload: dict) -> None:
     ensure_collection()
     qmodels = get_models()
@@ -48,6 +123,7 @@ def upsert_vector(*, vector_id: int | str, vector: list[float], payload: dict) -
         collection_name=COLLECTION_NAME,
         points=[qmodels.PointStruct(id=vector_id, vector=vector, payload=payload)],
     )
+    get_collection_mean_vector.cache_clear()
 
 
 def search_vectors(*, vector: list[float], limit: int = 5, score_threshold: float | None = None):
@@ -86,4 +162,5 @@ def delete_by_product_id(product_id: int) -> int:
             )
         ),
     )
+    get_collection_mean_vector.cache_clear()
     return 1

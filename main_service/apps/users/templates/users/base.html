@@ -1,201 +1,51 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Auth{% endblock %}</title>
-    <style>
-        :root {
-            --bg: #f5f6f8;
-            --surface: #ffffff;
-            --text: #1a1f2b;
-            --muted: #6b7280;
-            --border: #e5e7eb;
-            --accent: #1f6feb;
-            --accent-hover: #1553b7;
-            --danger: #b42318;
-            --success: #067647;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-            color: var(--text);
-            background: radial-gradient(circle at top left, #ffffff 0%, var(--bg) 50%, #eceff3 100%);
-        }
-
-        .page {
-            max-width: 880px;
-            margin: 0 auto;
-            padding: 2.5rem 1rem 3.5rem;
-        }
-
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            box-shadow: 0 16px 35px rgba(17, 24, 39, 0.07);
-            padding: 1.75rem;
-        }
-
-        .nav {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            flex-wrap: wrap;
-            margin-bottom: 1.5rem;
-        }
-
-        .nav a {
-            text-decoration: none;
-            color: var(--muted);
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            padding: 0.45rem 0.8rem;
-            font-size: 0.92rem;
-            transition: border-color 120ms ease, color 120ms ease;
-        }
-
-        .nav a:hover {
-            color: var(--text);
-            border-color: #cdd3dc;
-        }
-
-        h1 {
-            margin: 0 0 0.4rem;
-            font-weight: 600;
-            letter-spacing: -0.01em;
-        }
-
-        p {
-            margin: 0;
-            line-height: 1.6;
-        }
-
-        .subtext {
-            color: var(--muted);
-            margin-bottom: 1.4rem;
-        }
-
-        .stack {
-            display: grid;
-            gap: 0.9rem;
-        }
-
-        label {
-            font-size: 0.86rem;
-            color: var(--muted);
-            display: block;
-            margin-bottom: 0.35rem;
-        }
-
-        input {
-            width: 100%;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.65rem 0.75rem;
-            font-size: 0.95rem;
-            background: #fff;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #99b6ec;
-            box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.16);
-        }
-
-        .button {
-            border: 1px solid var(--accent);
-            background: var(--accent);
-            color: #fff;
-            border-radius: 10px;
-            padding: 0.62rem 0.95rem;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: background 120ms ease, border-color 120ms ease;
-        }
-
-        .button:hover {
-            background: var(--accent-hover);
-            border-color: var(--accent-hover);
-        }
-
-        .button.secondary {
-            background: #fff;
-            color: var(--text);
-            border-color: var(--border);
-        }
-
-        .button.secondary:hover {
-            border-color: #cdd3dc;
-            background: #f9fafb;
-        }
-
-        .status {
-            margin-top: 0.85rem;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            background: #fafbfd;
-            padding: 0.7rem 0.8rem;
-            font-size: 0.9rem;
-            color: var(--text);
-            white-space: pre-wrap;
-        }
-
-        .status.error {
-            border-color: #f4c7c3;
-            background: #fef4f3;
-            color: var(--danger);
-        }
-
-        .status.success {
-            border-color: #b7e7ce;
-            background: #ecfdf3;
-            color: var(--success);
-        }
-
-        .actions {
-            display: flex;
-            gap: 0.6rem;
-            flex-wrap: wrap;
-            margin-top: 0.2rem;
-        }
-
-        pre {
-            margin: 0;
-            font-size: 0.85rem;
-            overflow-x: auto;
-            color: #0f172a;
-        }
-
-        @media (max-width: 640px) {
-            .page {
-                padding-top: 1.25rem;
-            }
-
-            .card {
-                padding: 1.15rem;
-                border-radius: 12px;
-            }
-        }
-    </style>
+    <meta name="theme-color" content="#050505">
+    <meta name="description" content="A minimalist image-search storefront powered by main_service.">
+    <title>{% block title %}WAMS{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'users/site.css' %}">
+    {% block head_extra %}{% endblock %}
 </head>
 <body>
-    <main class="page">
-        <nav class="nav" aria-label="Main">
-            <a href="/">Home</a>
-            <a href="/auth/register/">Register</a>
-            <a href="/auth/login/">Login</a>
-            <a href="/auth/profile/">Profile</a>
-        </nav>
-        <section class="card">
+    <div class="page-shell">
+        <header class="site-topbar">
+            <a class="brand" href="/" aria-label="WAMS home">
+                <span class="brand-mark"></span>
+                <span class="brand-copy">
+                    <strong>WAMS</strong>
+                    <span>visual commerce</span>
+                </span>
+            </a>
+            <nav class="site-nav" aria-label="Main">
+                <a href="/">Shop</a>
+                <a href="/demo/">Lab</a>
+                <a href="/auth/login/">Login</a>
+                <a href="/auth/register/">Register</a>
+                <a href="/auth/profile/">Profile</a>
+            </nav>
+        </header>
+
+        <main class="site-main">
             {% block content %}{% endblock %}
-        </section>
-    </main>
+        </main>
+    </div>
+    <script>
+        window.__wamsInit = function (callback) {
+            if (window.WAMS) {
+                callback(window.WAMS);
+                return;
+            }
+
+            window.addEventListener("wams:ready", function () {
+                callback(window.WAMS);
+            }, { once: true });
+        };
+    </script>
+    <script src="{% static 'users/site.js' %}" defer></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

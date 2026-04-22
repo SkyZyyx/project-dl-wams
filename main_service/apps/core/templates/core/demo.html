@@ -1,0 +1,246 @@
+{% extends "users/base.html" %}
+
+{% block title %}WAMS | Search lab{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <p class="eyebrow">Advanced lab</p>
+        <h1>Search flow and Grad-CAM, fully exposed.</h1>
+        <p class="lede">This page is for debugging the exact customer journey: image upload, confidence tuning, hydrated product matches, and a second API call for Grad-CAM inspection.</p>
+    </div>
+    <aside class="status-card">
+        <div class="section-label">Lab protocol</div>
+        <div class="status-grid">
+            <div class="status-item" id="lab-search-status">
+                <strong>Idle</strong>
+                <span>Pick an image to run both endpoints.</span>
+            </div>
+            <div class="status-item" id="lab-overlay-status">
+                <strong>Overlay pending</strong>
+                <span>The Grad-CAM response will render beside the results.</span>
+            </div>
+        </div>
+    </aside>
+</section>
+
+<section class="lab-grid">
+    <div class="panel">
+        <div class="panel-head">
+            <div>
+                <p class="card-label">Inputs</p>
+                <h3>One upload drives both calls.</h3>
+            </div>
+            <span class="pill" id="lab-file-pill">No file selected</span>
+        </div>
+
+        <label class="dropzone" id="lab-dropzone">
+            <input id="lab-image" type="file" accept="image/*">
+            <p class="dropzone-title">Drop a reference image.</p>
+            <p class="dropzone-copy">The browser sends the file as multipart form data to <code>/api/search/</code> and then to <code>/api/gradcam/</code>.</p>
+        </label>
+
+        <div class="slider-row">
+            <div class="control-label">
+                <span>Confidence threshold</span>
+                <output id="lab-threshold-value">0.40</output>
+            </div>
+            <input id="lab-threshold" type="range" min="0" max="1" step="0.01" value="0.40">
+        </div>
+
+        <div class="form-actions">
+            <button class="button" id="lab-run" type="button">Run search + Grad-CAM</button>
+            <button class="ghost-button" id="lab-reset" type="button">Reset</button>
+        </div>
+
+        <div class="notice" id="lab-status" data-tone="info">Waiting for an image.</div>
+
+        <div class="section-head" style="margin-top: 4px;">
+            <div>
+                <p class="section-label">Matches</p>
+                <h2>Hydrated product results.</h2>
+            </div>
+            <span class="pill" id="lab-result-count">0 results</span>
+        </div>
+        <div class="product-grid" id="lab-results"></div>
+    </div>
+
+    <div class="panel lab-preview">
+        <div class="panel-head">
+            <div>
+                <p class="card-label">Grad-CAM</p>
+                <h3>Attention inspection.</h3>
+            </div>
+            <span class="pill">Overlay response</span>
+        </div>
+
+        <div class="lab-figure">
+            <img id="lab-overlay-image" alt="Grad-CAM overlay" hidden>
+            <div class="empty-state" id="lab-overlay-placeholder">Run the lab to reveal the heatmap overlay.</div>
+        </div>
+
+        <div class="notice" id="lab-overlay-copy" data-tone="info">No overlay requested yet.</div>
+
+        <div>
+            <p class="section-label">Search payload</p>
+            <pre class="lab-json" id="lab-search-json">{}</pre>
+        </div>
+
+        <div>
+            <p class="section-label">Grad-CAM payload</p>
+            <pre class="lab-json" id="lab-overlay-json">{}</pre>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        window.__wamsInit(function (ui) {
+            var imageInput = document.getElementById("lab-image");
+            var dropzone = document.getElementById("lab-dropzone");
+            var threshold = document.getElementById("lab-threshold");
+            var thresholdValue = document.getElementById("lab-threshold-value");
+            var runButton = document.getElementById("lab-run");
+            var resetButton = document.getElementById("lab-reset");
+            var status = document.getElementById("lab-status");
+            var overlayStatus = document.getElementById("lab-overlay-status");
+            var overlayCopy = document.getElementById("lab-overlay-copy");
+            var overlayImage = document.getElementById("lab-overlay-image");
+            var overlayPlaceholder = document.getElementById("lab-overlay-placeholder");
+            var results = document.getElementById("lab-results");
+            var resultCount = document.getElementById("lab-result-count");
+            var filePill = document.getElementById("lab-file-pill");
+            var searchJson = document.getElementById("lab-search-json");
+            var overlayJson = document.getElementById("lab-overlay-json");
+
+            var currentFile = null;
+
+            function setFile(file) {
+                currentFile = file || null;
+                filePill.textContent = currentFile ? currentFile.name : "No file selected";
+                dropzone.classList.toggle("is-active", !!currentFile);
+            }
+
+            function setSearchState(tone, title, detail) {
+                ui.setStatus(status, tone, title, detail);
+            }
+
+            function setOverlayState(tone, title, detail) {
+                ui.setStatus(overlayStatus, tone, title, detail);
+                ui.setStatus(overlayCopy, tone, title, detail);
+            }
+
+            function renderResults(items) {
+                ui.renderProductGrid(results, items, {
+                    showScore: true,
+                    featured: true,
+                    emptyMessage: "No matches yet."
+                });
+            }
+
+            function syncThreshold() {
+                thresholdValue.textContent = Number(threshold.value).toFixed(2);
+            }
+
+            imageInput.addEventListener("change", function () {
+                setFile(imageInput.files && imageInput.files[0]);
+            });
+
+            dropzone.addEventListener("dragover", function (event) {
+                event.preventDefault();
+                dropzone.classList.add("is-active");
+            });
+
+            dropzone.addEventListener("dragleave", function (event) {
+                if (dropzone.contains(event.relatedTarget)) {
+                    return;
+                }
+                dropzone.classList.toggle("is-active", !!currentFile);
+            });
+
+            dropzone.addEventListener("drop", function (event) {
+                var file;
+                event.preventDefault();
+                dropzone.classList.remove("is-active");
+                file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+                if (file) {
+                    setFile(file);
+                }
+            });
+
+            threshold.addEventListener("input", syncThreshold);
+
+            resetButton.addEventListener("click", function () {
+                imageInput.value = "";
+                setFile(null);
+                renderResults([]);
+                searchJson.textContent = "{}";
+                overlayJson.textContent = "{}";
+                overlayImage.hidden = true;
+                overlayImage.removeAttribute("src");
+                overlayPlaceholder.hidden = false;
+                setSearchState("info", "Reset complete", "Choose another image to relaunch the lab.");
+                setOverlayState("info", "Overlay pending", "Grad-CAM is waiting for a new image.");
+                resultCount.textContent = "0 results";
+            });
+
+            runButton.addEventListener("click", async function () {
+                if (!currentFile) {
+                    setSearchState("error", "Choose an image first", "The lab needs a reference image.");
+                    return;
+                }
+
+                runButton.disabled = true;
+                runButton.textContent = "Running";
+                setSearchState("info", "Running search", "Posting the image as multipart form data to main_service.");
+                setOverlayState("info", "Overlay pending", "Grad-CAM will run after the search completes.");
+
+                try {
+                    var searchPayload = await ui.searchWithImage(currentFile, threshold.value);
+                    var matches = searchPayload.matches || [];
+                    searchJson.textContent = JSON.stringify(searchPayload, null, 2);
+                    renderResults(matches);
+                    resultCount.textContent = matches.length + " result" + (matches.length === 1 ? "" : "s");
+
+                    if (matches.length) {
+                        setSearchState("success", matches.length + " products found", "The response is already hydrated by main_service.");
+                    } else {
+                        setSearchState("info", "No matches", searchPayload.detail || "Lower the threshold or try another image.");
+                    }
+
+                    var overlayPayload = await ui.gradcamWithImage(currentFile);
+                    overlayJson.textContent = JSON.stringify(overlayPayload, null, 2);
+                    overlayImage.hidden = true;
+                    overlayPlaceholder.hidden = false;
+
+                    if (overlayPayload.overlay_b64) {
+                        overlayImage.src = "data:image/png;base64," + overlayPayload.overlay_b64;
+                        overlayImage.hidden = false;
+                        overlayPlaceholder.hidden = true;
+                    }
+
+                    setOverlayState("success", "Overlay ready", overlayPayload.width && overlayPayload.height ? overlayPayload.width + "x" + overlayPayload.height + " heatmap returned." : "Grad-CAM payload loaded.");
+                } catch (error) {
+                    searchJson.textContent = JSON.stringify({ error: error.message }, null, 2);
+                    overlayJson.textContent = JSON.stringify({ error: error.message }, null, 2);
+                    renderResults([]);
+                    resultCount.textContent = "0 results";
+                    setSearchState("error", "Lab failed", error.message);
+                    setOverlayState("error", "Overlay failed", error.message);
+                } finally {
+                    runButton.disabled = false;
+                    runButton.textContent = "Run search + Grad-CAM";
+                }
+            });
+
+            syncThreshold();
+            setFile(null);
+            renderResults([]);
+            setSearchState("info", "Ready", "Waiting for the first image upload.");
+            setOverlayState("info", "Overlay pending", "No Grad-CAM request has been made yet.");
+        });
+    })();
+</script>
+{% endblock %}

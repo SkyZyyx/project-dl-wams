@@ -1,76 +1,98 @@
 {% extends "users/base.html" %}
 
-{% block title %}Register{% endblock %}
+{% block title %}WAMS | Register{% endblock %}
 
 {% block content %}
-<h1>Create your account</h1>
-<p class="subtext">This form sends data to <code>POST /api/auth/register/</code>.</p>
+<section class="auth-grid">
+    <div class="auth-panel hero">
+        <div>
+            <p class="eyebrow">Create account</p>
+            <h1 class="auth-title">Join the image-led storefront.</h1>
+            <p class="lede">Register with the existing auth API, then use the same JWT flow to sign in and inspect your profile.</p>
+        </div>
+    </div>
 
-<form id="register-form" class="stack">
-    <div>
-        <label for="username">Username</label>
-        <input id="username" name="username" required>
-    </div>
-    <div>
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" required>
-    </div>
-    <div>
-        <label for="first_name">First name</label>
-        <input id="first_name" name="first_name">
-    </div>
-    <div>
-        <label for="last_name">Last name</label>
-        <input id="last_name" name="last_name">
-    </div>
-    <div>
-        <label for="password">Password (8+ chars)</label>
-        <input id="password" name="password" type="password" minlength="8" required>
-    </div>
-    <div class="actions">
-        <button class="button" type="submit">Register</button>
-        <a class="button secondary" href="/auth/login/">Go to login</a>
-    </div>
-</form>
+    <div class="auth-panel panel auth-card">
+        <div class="auth-head">
+            <div>
+                <p class="card-label">Register</p>
+                <h3>Start a new session.</h3>
+            </div>
+            <a class="card-link" href="/auth/login/">Already registered?</a>
+        </div>
 
-<div class="status" id="register-status">Idle</div>
+        <form id="register-form" class="form">
+            <div class="field">
+                <label for="username">Username</label>
+                <input class="input" id="username" name="username" required>
+            </div>
+            <div class="field">
+                <label for="email">Email</label>
+                <input class="input" id="email" name="email" type="email" autocomplete="email" required>
+            </div>
+            <div class="grid-2" style="gap: 14px;">
+                <div class="field">
+                    <label for="first_name">First name</label>
+                    <input class="input" id="first_name" name="first_name" autocomplete="given-name">
+                </div>
+                <div class="field">
+                    <label for="last_name">Last name</label>
+                    <input class="input" id="last_name" name="last_name" autocomplete="family-name">
+                </div>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input class="input" id="password" name="password" type="password" minlength="8" autocomplete="new-password" required>
+            </div>
+            <div class="form-actions">
+                <button class="button" type="submit">Register</button>
+                <a class="ghost-button" href="/">Back to shop</a>
+            </div>
+        </form>
 
+        <div class="notice" id="register-status" data-tone="info">Idle.</div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
 <script>
-    document.getElementById("register-form").addEventListener("submit", async function (event) {
-        event.preventDefault();
-        var status = document.getElementById("register-status");
-        status.className = "status";
-        status.textContent = "Submitting...";
+    (function () {
+        window.__wamsInit(function (ui) {
+            var form = document.getElementById("register-form");
+            var status = document.getElementById("register-status");
 
-        var formData = new FormData(event.currentTarget);
-        var payload = {
-            username: formData.get("username"),
-            email: formData.get("email"),
-            first_name: formData.get("first_name"),
-            last_name: formData.get("last_name"),
-            password: formData.get("password")
-        };
+            form.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                ui.setStatus(status, "info", "Submitting", "Creating the account through /api/auth/register/.");
 
-        try {
-            var response = await fetch("/api/auth/register/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                try {
+                    var formData = new FormData(form);
+                    var payload = {
+                        username: formData.get("username"),
+                        email: formData.get("email"),
+                        first_name: formData.get("first_name"),
+                        last_name: formData.get("last_name"),
+                        password: formData.get("password")
+                    };
+
+                    var response = await fetch("/api/auth/register/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    var data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.detail || JSON.stringify(data));
+                    }
+
+                    ui.setStatus(status, "success", "Registration complete", "You can now sign in and open the profile page.");
+                } catch (error) {
+                    ui.setStatus(status, "error", "Registration failed", error.message);
+                }
             });
-
-            var data = await response.json();
-            if (!response.ok) {
-                status.classList.add("error");
-                status.textContent = "Registration failed: " + JSON.stringify(data, null, 2);
-                return;
-            }
-
-            status.classList.add("success");
-            status.textContent = "Registration succeeded (HTTP " + response.status + "). You can now log in.";
-        } catch (error) {
-            status.classList.add("error");
-            status.textContent = "Request failed: " + error.message;
-        }
-    });
+        });
+    })();
 </script>
 {% endblock %}

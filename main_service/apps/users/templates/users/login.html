@@ -1,63 +1,81 @@
 {% extends "users/base.html" %}
 
-{% block title %}Login{% endblock %}
+{% block title %}WAMS | Login{% endblock %}
 
 {% block content %}
-<h1>Sign in</h1>
-<p class="subtext">This form calls <code>POST /api/auth/login/</code> and stores the returned access token in localStorage.</p>
-
-<form id="login-form" class="stack">
-    <div>
-        <label for="username">Username</label>
-        <input id="username" name="username" required>
+<section class="auth-grid">
+    <div class="auth-panel hero">
+        <div>
+            <p class="eyebrow">Account access</p>
+            <h1 class="auth-title">Sign in to your storefront session.</h1>
+            <p class="lede">This login form still uses the existing JWT endpoint and stores the access token in <code>localStorage</code> so the profile page can retrieve it later.</p>
+        </div>
     </div>
-    <div>
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" required>
-    </div>
-    <div class="actions">
-        <button class="button" type="submit">Login</button>
-        <a class="button secondary" href="/auth/register/">Need an account?</a>
-    </div>
-</form>
 
-<div class="status" id="login-status">Idle</div>
+    <div class="auth-panel panel auth-card">
+        <div class="auth-head">
+            <div>
+                <p class="card-label">Login</p>
+                <h3>Return to your account.</h3>
+            </div>
+            <a class="card-link" href="/auth/register/">Need an account?</a>
+        </div>
 
+        <form id="login-form" class="form">
+            <div class="field">
+                <label for="username">Username</label>
+                <input class="input" id="username" name="username" autocomplete="username" required>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+            </div>
+            <div class="form-actions">
+                <button class="button" type="submit">Login</button>
+                <a class="ghost-button" href="/">Back to shop</a>
+            </div>
+        </form>
+
+        <div class="notice" id="login-status" data-tone="info">Idle.</div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
 <script>
-    var tokenKey = "auth_access_token";
-    document.getElementById("login-form").addEventListener("submit", async function (event) {
-        event.preventDefault();
-        var status = document.getElementById("login-status");
-        status.className = "status";
-        status.textContent = "Signing in...";
+    (function () {
+        window.__wamsInit(function (ui) {
+            var tokenKey = "auth_access_token";
+            var form = document.getElementById("login-form");
+            var status = document.getElementById("login-status");
 
-        var formData = new FormData(event.currentTarget);
-        var payload = {
-            username: formData.get("username"),
-            password: formData.get("password")
-        };
+            form.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                ui.setStatus(status, "info", "Signing in", "Posting credentials to /api/auth/login/.");
 
-        try {
-            var response = await fetch("/api/auth/login/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                try {
+                    var formData = new FormData(form);
+                    var response = await fetch("/api/auth/login/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            username: formData.get("username"),
+                            password: formData.get("password")
+                        })
+                    });
+                    var data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.detail || JSON.stringify(data));
+                    }
+
+                    localStorage.setItem(tokenKey, data.access || "");
+                    ui.setStatus(status, "success", "Login successful", "Access token stored locally. Open profile to verify it.");
+                } catch (error) {
+                    ui.setStatus(status, "error", "Login failed", error.message);
+                }
             });
-            var data = await response.json();
-
-            if (!response.ok) {
-                status.classList.add("error");
-                status.textContent = "Login failed: " + JSON.stringify(data, null, 2);
-                return;
-            }
-
-            localStorage.setItem(tokenKey, data.access || "");
-            status.classList.add("success");
-            status.textContent = "Login successful. Access token stored. Open profile to validate auth.";
-        } catch (error) {
-            status.classList.add("error");
-            status.textContent = "Request failed: " + error.message;
-        }
-    });
+        });
+    })();
 </script>
 {% endblock %}

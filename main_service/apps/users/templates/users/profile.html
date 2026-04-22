@@ -1,67 +1,105 @@
 {% extends "users/base.html" %}
 
-{% block title %}Profile{% endblock %}
+{% block title %}WAMS | Profile{% endblock %}
 
 {% block content %}
-<h1>Your profile</h1>
-<p class="subtext">Uses <code>GET /api/auth/profile/</code> with <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+<section class="auth-grid">
+    <div class="auth-panel hero">
+        <div>
+            <p class="eyebrow">Profile</p>
+            <h1 class="auth-title">Your stored JWT session, checked live.</h1>
+            <p class="lede">This page still uses <code>GET /api/auth/profile/</code> with the bearer token saved in <code>localStorage</code>. Nothing about the auth flow changed.</p>
+        </div>
+    </div>
 
-<div class="actions">
-    <button class="button" id="load-profile" type="button">Load profile</button>
-    <button class="button secondary" id="logout" type="button">Logout</button>
-    <a class="button secondary" href="/auth/login/">Back to login</a>
-</div>
+    <div class="auth-panel panel auth-card">
+        <div class="auth-head">
+            <div>
+                <p class="card-label">Session</p>
+                <h3>Load your profile.</h3>
+            </div>
+            <div class="cta-row">
+                <button class="button" id="load-profile" type="button">Load profile</button>
+                <button class="ghost-button" id="logout" type="button">Logout</button>
+            </div>
+        </div>
 
-<div class="status" id="profile-status">Idle</div>
+        <div class="notice" id="profile-status" data-tone="info">Idle.</div>
+        <div class="panel" style="padding: 18px; background: rgba(255,255,255,0.02); box-shadow: none;">
+            <ul class="meta-list" id="profile-meta">
+                <li><span>Token state</span><strong>Waiting</strong></li>
+                <li><span>Endpoint</span><strong>/api/auth/profile/</strong></li>
+                <li><span>Storage key</span><strong>auth_access_token</strong></li>
+            </ul>
+        </div>
+    </div>
+</section>
+{% endblock %}
 
+{% block scripts %}
 <script>
-    var tokenKey = "auth_access_token";
-    var statusEl = document.getElementById("profile-status");
+    (function () {
+        window.__wamsInit(function (ui) {
+            var tokenKey = "auth_access_token";
+            var statusEl = document.getElementById("profile-status");
+            var metaEl = document.getElementById("profile-meta");
 
-    function showStatus(message, level) {
-        statusEl.className = "status";
-        if (level) {
-            statusEl.classList.add(level);
-        }
-        statusEl.textContent = message;
-    }
-
-    async function loadProfile() {
-        var token = localStorage.getItem(tokenKey);
-        if (!token) {
-            showStatus("Unauthorized: no local access token found.", "error");
-            return;
-        }
-
-        showStatus("Loading profile...");
-
-        try {
-            var response = await fetch("/api/auth/profile/", {
-                method: "GET",
-                headers: {
-                    Authorization: "Bearer " + token
-                }
-            });
-            var data = await response.json();
-
-            if (!response.ok) {
-                showStatus("Request failed (HTTP " + response.status + "): " + JSON.stringify(data, null, 2), "error");
-                return;
+            function renderMeta(data) {
+                metaEl.innerHTML = [
+                    ["User ID", data.id],
+                    ["Username", data.username],
+                    ["Email", data.email || "Not set"],
+                    ["Name", [data.first_name, data.last_name].filter(Boolean).join(" ") || "Not set"]
+                ].map(function (pair) {
+                    return "<li><span>" + pair[0] + "</span><strong>" + ui.escapeHtml(String(pair[1])) + "</strong></li>";
+                }).join("");
             }
 
-            statusEl.className = "status success";
-            statusEl.innerHTML = "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
-        } catch (error) {
-            showStatus("Request failed: " + error.message, "error");
-        }
-    }
+            async function loadProfile() {
+                var token = localStorage.getItem(tokenKey);
+                if (!token) {
+                    ui.setStatus(statusEl, "error", "Unauthorized", "No local access token found.");
+                    return;
+                }
 
-    document.getElementById("load-profile").addEventListener("click", loadProfile);
-    document.getElementById("logout").addEventListener("click", function () {
-        localStorage.removeItem(tokenKey);
-        showStatus("Logged out locally. Token removed.", "success");
-    });
+                ui.setStatus(statusEl, "info", "Loading profile", "Calling /api/auth/profile/ with a bearer token.");
 
-    loadProfile();
+                try {
+                    var response = await fetch("/api/auth/profile/", {
+                        method: "GET",
+                        headers: {
+                            Authorization: "Bearer " + token,
+                            Accept: "application/json"
+                        }
+                    });
+                    var data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.detail || JSON.stringify(data));
+                    }
+
+                    renderMeta(data);
+                    ui.setStatus(statusEl, "success", "Profile loaded", "The auth endpoint returned the current user object.");
+                } catch (error) {
+                    ui.setStatus(statusEl, "error", "Profile request failed", error.message);
+                }
+            }
+
+            document.getElementById("load-profile").addEventListener("click", loadProfile);
+            document.getElementById("logout").addEventListener("click", function () {
+                localStorage.removeItem(tokenKey);
+                ui.setStatus(statusEl, "success", "Logged out locally", "The token was removed from localStorage.");
+                metaEl.innerHTML = [
+                    ["Token state", "Cleared"],
+                    ["Endpoint", "/api/auth/profile/"],
+                    ["Storage key", tokenKey]
+                ].map(function (pair) {
+                    return "<li><span>" + pair[0] + "</span><strong>" + pair[1] + "</strong></li>";
+                }).join("");
+            });
+
+            loadProfile();
+        });
+    })();
 </script>
 {% endblock %}

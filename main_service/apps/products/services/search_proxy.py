@@ -60,6 +60,26 @@ def proxy_search_image(*, image_name: str, image_bytes: bytes, content_type: str
         raise SearchServiceError("search service request failed") from exc
 
 
+def proxy_search_image_with_threshold(*, image_name: str, image_bytes: bytes, content_type: str, score_threshold: float | None) -> dict:
+    fields = {}
+    if score_threshold is not None:
+        fields["score_threshold"] = str(score_threshold)
+    body, boundary = _multipart_body(
+        fields=fields,
+        files={"image": (image_name, image_bytes, content_type or "application/octet-stream")},
+    )
+    url = f"{settings.SEARCH_SERVICE_URL.rstrip('/')}/api/search/"
+    try:
+        return _json_request(
+            "POST",
+            url,
+            body=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"},
+        )
+    except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
+        raise SearchServiceError("search service request failed") from exc
+
+
 def index_product_image(*, product_id: int, product_image_id: int, image_name: str, image_bytes: bytes, content_type: str) -> dict:
     body, boundary = _multipart_body(
         fields={"product_id": str(product_id), "product_image_id": str(product_image_id)},
@@ -83,3 +103,20 @@ def delete_product_index(product_id: int) -> dict:
         return _json_request("DELETE", url, headers={"Accept": "application/json"})
     except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
         raise SearchServiceError("delete request failed") from exc
+
+
+def proxy_gradcam_image(*, image_name: str, image_bytes: bytes, content_type: str) -> dict:
+    body, boundary = _multipart_body(
+        fields={},
+        files={"image": (image_name, image_bytes, content_type or "application/octet-stream")},
+    )
+    url = f"{settings.SEARCH_SERVICE_URL.rstrip('/')}/api/gradcam/"
+    try:
+        return _json_request(
+            "POST",
+            url,
+            body=body,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"},
+        )
+    except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
+        raise SearchServiceError("gradcam request failed") from exc

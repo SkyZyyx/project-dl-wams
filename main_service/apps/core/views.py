@@ -1,4 +1,5 @@
 from django.db import connection
+from django.views.generic import TemplateView
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -6,7 +7,7 @@ from rest_framework.views import APIView
 
 from apps.products.models import Product
 from apps.products.serializers import ProductSerializer
-from apps.products.services.search_proxy import SearchServiceError, proxy_search_image
+from apps.products.services.search_proxy import SearchServiceError, proxy_gradcam_image, proxy_search_image_with_threshold
 
 
 @api_view(["GET"])
@@ -32,15 +33,30 @@ class SearchView(APIView):
             return Response({"image": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            search_payload = proxy_search_image(
+            score_threshold = request.data.get("score_threshold")
+            if score_threshold in (None, ""):
+                threshold_value = None
+            else:
+                threshold_value = float(score_threshold)
+            search_payload = proxy_search_image_with_threshold(
                 image_name=image.name,
                 image_bytes=image.read(),
                 content_type=getattr(image, "content_type", "application/octet-stream"),
+                score_threshold=threshold_value,
             )
+        except ValueError:
+            return Response({"score_threshold": ["Enter a valid number."]}, status=status.HTTP_400_BAD_REQUEST)
         except SearchServiceError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
         matches = search_payload.get("matches", [])
+        if not matches:
+            response_data = {"matches": []}
+            detail = search_payload.get("detail")
+            if detail:
+                response_data["detail"] = detail
+            return Response(response_data)
+
         product_ids = []
         best_matches = {}
         for match in matches:
@@ -81,3 +97,27 @@ class SearchView(APIView):
 
         hydrated_matches.sort(key=lambda item: item.get("score", 0), reverse=True)
         return Response({"matches": hydrated_matches})
+
+
+class GradCamView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        image = request.FILES.get("image")
+        if image is None:
+            return Response({"image": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            payload = proxy_gradcam_image(
+                image_name=image.name,
+                image_bytes=image.read(),
+                content_type=getattr(image, "content_type", "application/octet-stream"),
+            )
+        except SearchServiceError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(payload)
+
+
+class DemoPageView(TemplateView):
+    template_name = "core/demo.html"

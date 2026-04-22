@@ -3,11 +3,13 @@ from django.conf import settings
 from django.urls import include, path
 from django.conf.urls.static import static
 
+from apps.core.views import DemoPageView
 from apps.users.views import LandingPageView
 
 
 urlpatterns = [
     path("", LandingPageView.as_view(), name="home"),
+    path("demo/", DemoPageView.as_view(), name="demo"),
     path("auth/", include("apps.users.ui_urls")),
     path("admin/", admin.site.urls),
     path("api/", include("apps.core.urls")),
