@@ -22,7 +22,7 @@ DATASET_ARCHIVES = {
     "images": f"{DATASET_BASE_URL}/ut-zap50k-images.zip",
 }
 
-MAX_PRODUCTS_PER_CATEGORY = 2
+DEFAULT_PRODUCT_TARGET = 8
 MAX_IMAGES_PER_PRODUCT = 3
 
 
@@ -89,6 +89,12 @@ def _lookup_image_path(image_index: dict[str, Path], cid: str) -> Path | None:
     if exact is not None:
         return exact
 
+    # UT Zappos50K uses dashes in CIDs but dots in filenames (e.g., 100627-72 -> 100627.72)
+    cid_with_dots = cid_key.replace("-", ".")
+    exact_dot = image_index.get(cid_with_dots)
+    if exact_dot is not None:
+        return exact_dot
+
     for key, path in image_index.items():
         if key.startswith(cid_key):
             return path
@@ -96,7 +102,42 @@ def _lookup_image_path(image_index: dict[str, Path], cid: str) -> Path | None:
     return None
 
 
-def _seed_records() -> list[DemoRecord]:
+def _ordered_product_groups(grouped: dict[str, list[DemoRecord]]) -> list[list[DemoRecord]]:
+    per_category_products: dict[str, dict[str, list[DemoRecord]]] = {}
+    category_order = sorted(grouped.keys())
+
+    for category in category_order:
+        per_product: dict[str, list[DemoRecord]] = defaultdict(list)
+        for record in grouped[category]:
+            per_product[record.product_id].append(record)
+        per_category_products[category] = per_product
+
+    ordered_product_keys: list[tuple[str, str]] = []
+    category_indexes = {category: 0 for category in category_order}
+    category_product_ids = {
+        category: sorted(per_category_products[category].keys()) for category in category_order
+    }
+
+    while True:
+        progressed = False
+        for category in category_order:
+            product_ids = category_product_ids[category]
+            index = category_indexes[category]
+            if index >= len(product_ids):
+                continue
+            ordered_product_keys.append((category, product_ids[index]))
+            category_indexes[category] += 1
+            progressed = True
+        if not progressed:
+            break
+
+    return [
+        sorted(per_category_products[category][product_id], key=lambda item: item.cid)
+        for category, product_id in ordered_product_keys
+    ]
+
+
+def _seed_product_groups() -> list[list[DemoRecord]]:
     cache_dir = Path(settings.MEDIA_ROOT).resolve().parent / ".demo_dataset_cache"
     data_zip = _download_file(DATASET_ARCHIVES["data"], cache_dir / "ut-zap50k-data.zip")
     images_zip = _download_file(DATASET_ARCHIVES["images"], cache_dir / "ut-zap50k-images.zip")
@@ -139,15 +180,7 @@ def _seed_records() -> list[DemoRecord]:
         )
         seen_cids.add(cid_key)
 
-    selected: list[DemoRecord] = []
-    for category in sorted(grouped.keys()):
-        per_category = grouped[category]
-        per_product: dict[str, list[DemoRecord]] = defaultdict(list)
-        for record in per_category:
-            per_product[record.product_id].append(record)
-
-        for product_id in sorted(per_product.keys())[:MAX_PRODUCTS_PER_CATEGORY]:
-            selected.extend(sorted(per_product[product_id], key=lambda item: item.cid)[:MAX_IMAGES_PER_PRODUCT])
+    selected = _ordered_product_groups(grouped)
 
     if not selected:
         raise CommandError("no UT Zappos50K images were found after download")
@@ -174,11 +207,36 @@ def _to_uploaded_file(image_path: Path, *, name: str) -> SimpleUploadedFile:
 class Command(BaseCommand):
     help = "Seed demo products from the UT Zappos50K shoe dataset."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--products",
+            type=int,
+            default=DEFAULT_PRODUCT_TARGET,
+            help="Number of products to seed across categories.",
+        )
+        parser.add_argument(
+            "--images-per-product",
+            type=int,
+            default=MAX_IMAGES_PER_PRODUCT,
+            help="Maximum number of images to index per product.",
+        )
+
     def handle(self, *args, **options):
         call_command("migrate", interactive=False, verbosity=0)
 
+        target_products = options["products"]
+        max_images_per_product = options["images_per_product"]
+        if target_products < 1:
+            raise CommandError("--products must be >= 1")
+        if max_images_per_product < 1:
+            raise CommandError("--images-per-product must be >= 1")
+
         self.stdout.write("Downloading and preparing UT Zappos50K demo data...")
-        records = _seed_records()
+        product_groups = _seed_product_groups()
+        if target_products > len(product_groups):
+            raise CommandError(
+                f"requested {target_products} demo products but only {len(product_groups)} products have usable images"
+            )
 
         self.stdout.write("Clearing previous demo rows...")
         _clear_demo_data()
@@ -186,8 +244,13 @@ class Command(BaseCommand):
         categories: dict[str, Category] = {}
         products: dict[str, Product] = {}
         product_order: list[str] = []
+        indexed_image_count = 0
 
-        for record in records:
+        for records in product_groups:
+            if len(product_order) >= target_products:
+                break
+
+            record = records[0]
             category_name = f"{DEMO_PREFIX} {record.category}"
             category = categories.get(category_name)
             if category is None:
@@ -195,31 +258,48 @@ class Command(BaseCommand):
                 categories[category_name] = category
 
             product_key = f"{record.category}:{record.product_id}"
-            product = products.get(product_key)
-            if product is None:
-                product = Product.objects.create(
-                    name=f"{DEMO_PREFIX} {record.subcategory} {record.product_id}",
-                    description=f"UT Zappos50K shoe from the {record.category.lower()} category.",
-                    price=Decimal("49.99"),
-                    category=category,
-                )
-                products[product_key] = product
-                product_order.append(product_key)
-
-            image = ProductImage.objects.create(
-                product=product,
-                image=_to_uploaded_file(record.image_path, name=record.cid),
-                is_primary=not product.images.exists(),
+            product = Product.objects.create(
+                name=f"{DEMO_PREFIX} {record.subcategory} {record.product_id}",
+                description=f"UT Zappos50K shoe from the {record.category.lower()} category.",
+                price=Decimal("49.99"),
+                category=category,
             )
-            image.refresh_from_db()
 
-            if not image.indexed or not image.qdrant_id:
-                raise CommandError(
-                    f"failed to index demo image {record.cid} (indexed={image.indexed}, qdrant_id={image.qdrant_id!r})"
+            created_images: list[ProductImage] = []
+            product_failed = False
+            for image_index, product_record in enumerate(records[:max_images_per_product]):
+                image = ProductImage.objects.create(
+                    product=product,
+                    image=_to_uploaded_file(product_record.image_path, name=product_record.cid),
+                    is_primary=image_index == 0,
                 )
+                image.refresh_from_db()
+
+                if not image.indexed or not image.qdrant_id:
+                    product_failed = True
+                    image.delete()
+                    break
+
+                created_images.append(image)
+
+            if product_failed or not created_images:
+                product.delete()
+                if not category.products.exists():
+                    categories.pop(category_name, None)
+                    category.delete()
+                continue
+
+            products[product_key] = product
+            product_order.append(product_key)
+            indexed_image_count += len(created_images)
+
+        if len(product_order) < target_products:
+            raise CommandError(
+                f"seeded only {len(product_order)} products before candidates were exhausted; target was {target_products}"
+            )
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Seeded {len(categories)} categories, {len(product_order)} products, and {len(records)} images from UT Zappos50K."
+                f"Seeded {len(categories)} categories, {len(product_order)} products, and {indexed_image_count} images from UT Zappos50K."
             )
         )

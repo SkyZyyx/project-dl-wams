@@ -5,10 +5,15 @@ from math import sqrt
 from PIL import Image, ImageOps
 
 from .embedder import get_embedder
+from .model_registry import get_model_spec
 
 
-def generate_gradcam_overlay(image_bytes: bytes) -> dict:
-    embedder = get_embedder()
+def generate_gradcam_overlay(image_bytes: bytes, model_id: str | None = None) -> dict:
+    spec = get_model_spec(model_id)
+    if not spec.gradcam_supported:
+        raise ValueError(f"gradcam is not supported for model '{spec.model_id}'")
+
+    embedder = get_embedder(spec.model_id)
     embedder._load()
 
     torch = embedder._torch

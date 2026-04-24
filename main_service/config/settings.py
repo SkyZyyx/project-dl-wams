@@ -11,7 +11,7 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
-        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,main_service,nginx"
+        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,mainservice,nginx"
     ).split(",")
     if host.strip()
 ]
@@ -86,7 +86,8 @@ USE_TZ = True
 STATIC_URL = "/static/"
 MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
-SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://search_service:8001")
+SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://searchservice:8001")
+SEARCH_SERVICE_TIMEOUT_SECONDS = int(os.getenv("SEARCH_SERVICE_TIMEOUT_SECONDS", "300"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -7,13 +7,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-search-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv(
-        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,search_service,nginx"
-    ).split(",")
-    if host.strip()
-]
+if DEBUG:
+    ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = [
+        host.strip()
+        for host in os.getenv(
+            "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,searchservice,nginx"
+        ).split(",")
+        if host.strip()
+    ]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -84,7 +87,12 @@ MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
-MAIN_SERVICE_URL = os.getenv("MAIN_SERVICE_URL", "http://main_service:8000")
+MAIN_SERVICE_URL = os.getenv("MAIN_SERVICE_URL", "http://mainservice:8000")
+DEFAULT_SEARCH_MODEL = os.getenv("DEFAULT_SEARCH_MODEL", "dinov2_base_pretrained")
+DINOv2_PRETRAINED_SOURCE = os.getenv("DINOv2_PRETRAINED_SOURCE", "facebook/dinov2-base")
+DINOv2_TRANSFER_SOURCE = os.getenv("DINOv2_TRANSFER_SOURCE", DINOv2_PRETRAINED_SOURCE)
+DINOv2_FINETUNED_SOURCE = os.getenv("DINOv2_FINETUNED_SOURCE", DINOv2_PRETRAINED_SOURCE)
+CLIP_VIT_B32_SOURCE = os.getenv("CLIP_VIT_B32_SOURCE", "openai/clip-vit-base-patch32")
 SEARCH_OOD_COSINE_THRESHOLD = float(os.getenv("SEARCH_OOD_COSINE_THRESHOLD", "0.35"))
 SEARCH_OOD_TOP_SCORE_THRESHOLD = float(os.getenv("SEARCH_OOD_TOP_SCORE_THRESHOLD", "0.45"))
 SEARCH_COLLECTION_SCROLL_LIMIT = int(os.getenv("SEARCH_COLLECTION_SCROLL_LIMIT", "256"))

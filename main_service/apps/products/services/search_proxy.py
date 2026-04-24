@@ -39,7 +39,7 @@ def _multipart_body(fields: dict[str, str], files: dict[str, tuple[str, bytes, s
 
 def _json_request(method: str, url: str, *, body: bytes | None = None, headers: dict[str, str] | None = None):
     request = urllib_request.Request(url, data=body, headers=headers or {}, method=method)
-    with urllib_request.urlopen(request, timeout=30) as response:
+    with urllib_request.urlopen(request, timeout=settings.SEARCH_SERVICE_TIMEOUT_SECONDS) as response:
         return json.loads(response.read().decode("utf-8"))
 
 

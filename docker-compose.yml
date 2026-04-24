@@ -35,12 +35,17 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL:-http://search_service:8001}
+      SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL:-http://searchservice:8001}
+      SEARCH_SERVICE_TIMEOUT_SECONDS: ${SEARCH_SERVICE_TIMEOUT_SECONDS:-300}
       MEDIA_ROOT: /app/media
       MEDIA_URL: /media/
     volumes:
       - ./main_service:/app
       - media_data:/app/media
+    networks:
+      default:
+        aliases:
+          - mainservice
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,7 +68,7 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
-      MAIN_SERVICE_URL: ${MAIN_SERVICE_URL:-http://main_service:8000}
+      MAIN_SERVICE_URL: ${MAIN_SERVICE_URL:-http://mainservice:8000}
       SEARCH_PREPROCESS_ENABLED: ${SEARCH_PREPROCESS_ENABLED:-1}
       SEARCH_PREPROCESS_USE_REMBG: ${SEARCH_PREPROCESS_USE_REMBG:-0}
       SEARCH_PREPROCESS_PAD: ${SEARCH_PREPROCESS_PAD:-12}
@@ -76,6 +81,10 @@ services:
     volumes:
       - ./search_service:/app
       - media_data:/app/media
+    networks:
+      default:
+        aliases:
+          - searchservice
     depends_on:
       postgres:
         condition: service_healthy

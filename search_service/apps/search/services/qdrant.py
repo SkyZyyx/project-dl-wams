@@ -6,9 +6,10 @@ from urllib import request as urllib_request
 
 from django.conf import settings
 
+from .model_registry import get_model_spec
 
-COLLECTION_NAME = "product_images"
-VECTOR_SIZE = 768
+
+_COLLECTION_MEAN_CACHE: dict[str, list[float] | None] = {}
 
 
 @lru_cache(maxsize=1)
@@ -25,20 +26,41 @@ def get_models():
     return qmodels
 
 
-def ensure_collection() -> None:
+def _resolve_spec(model_id: str | None = None):
+    return get_model_spec(model_id)
+
+
+def _cache_key(model_id: str | None = None) -> str:
+    return _resolve_spec(model_id).model_id
+
+
+def _collection_name(model_id: str | None = None) -> str:
+    return _resolve_spec(model_id).collection_name
+
+
+def _vector_size(model_id: str | None = None) -> int:
+    return _resolve_spec(model_id).vector_size
+
+
+def clear_collection_mean_vector_cache(model_id: str | None = None) -> None:
+    _COLLECTION_MEAN_CACHE.pop(_cache_key(model_id), None)
+
+
+def ensure_collection(model_id: str | None = None) -> None:
     client = get_client()
+    collection_name = _collection_name(model_id)
     if hasattr(client, "collection_exists"):
-        exists = client.collection_exists(COLLECTION_NAME)
+        exists = client.collection_exists(collection_name)
     else:
-        exists = COLLECTION_NAME in {collection.name for collection in client.get_collections().collections}
+        exists = collection_name in {collection.name for collection in client.get_collections().collections}
 
     if exists:
         return
 
     qmodels = get_models()
     client.create_collection(
-        collection_name=COLLECTION_NAME,
-        vectors_config=qmodels.VectorParams(size=VECTOR_SIZE, distance=qmodels.Distance.COSINE),
+        collection_name=collection_name,
+        vectors_config=qmodels.VectorParams(size=_vector_size(model_id), distance=qmodels.Distance.COSINE),
     )
 
 
@@ -49,17 +71,21 @@ def _normalize_vector(vector: list[float]) -> list[float]:
     return [value / norm for value in vector]
 
 
-@lru_cache(maxsize=1)
-def get_collection_mean_vector() -> list[float] | None:
-    ensure_collection()
+def get_collection_mean_vector(model_id: str | None = None) -> list[float] | None:
+    cache_key = _cache_key(model_id)
+    if cache_key in _COLLECTION_MEAN_CACHE:
+        return _COLLECTION_MEAN_CACHE[cache_key]
+
+    ensure_collection(model_id)
     client = get_client()
+    collection_name = _collection_name(model_id)
     total: list[float] | None = None
     count = 0
     offset = None
 
     while True:
         points, offset = client.scroll(
-            collection_name=COLLECTION_NAME,
+            collection_name=collection_name,
             limit=getattr(settings, "SEARCH_COLLECTION_SCROLL_LIMIT", 256),
             offset=offset,
             with_vectors=True,
@@ -90,13 +116,16 @@ def get_collection_mean_vector() -> list[float] | None:
             break
 
     if total is None or count == 0:
+        _COLLECTION_MEAN_CACHE[cache_key] = None
         return None
 
-    return _normalize_vector([value / count for value in total])
+    mean_vector = _normalize_vector([value / count for value in total])
+    _COLLECTION_MEAN_CACHE[cache_key] = mean_vector
+    return mean_vector
 
 
-def is_query_vector_out_of_distribution(*, vector: list[float]) -> bool:
-    mean_vector = get_collection_mean_vector()
+def is_query_vector_out_of_distribution(*, vector: list[float], model_id: str | None = None) -> bool:
+    mean_vector = get_collection_mean_vector(model_id)
     if mean_vector is None:
         return False
 
@@ -116,18 +145,18 @@ def is_top_hit_below_ood_threshold(*, results) -> bool:
     return top_score < getattr(settings, "SEARCH_OOD_TOP_SCORE_THRESHOLD", 0.45)
 
 
-def upsert_vector(*, vector_id: int | str, vector: list[float], payload: dict) -> None:
-    ensure_collection()
+def upsert_vector(*, vector_id: int | str, vector: list[float], payload: dict, model_id: str | None = None) -> None:
+    ensure_collection(model_id)
     qmodels = get_models()
     get_client().upsert(
-        collection_name=COLLECTION_NAME,
+        collection_name=_collection_name(model_id),
         points=[qmodels.PointStruct(id=vector_id, vector=vector, payload=payload)],
     )
-    get_collection_mean_vector.cache_clear()
+    clear_collection_mean_vector_cache(model_id)
 
 
-def search_vectors(*, vector: list[float], limit: int = 5, score_threshold: float | None = None):
-    ensure_collection()
+def search_vectors(*, vector: list[float], limit: int = 5, score_threshold: float | None = None, model_id: str | None = None):
+    ensure_collection(model_id)
     payload = {
         "vector": vector,
         "limit": limit,
@@ -138,7 +167,7 @@ def search_vectors(*, vector: list[float], limit: int = 5, score_threshold: floa
         payload["score_threshold"] = score_threshold
 
     request = urllib_request.Request(
-        f"{settings.QDRANT_URL}/collections/{COLLECTION_NAME}/points/search",
+        f"{settings.QDRANT_URL}/collections/{_collection_name(model_id)}/points/search",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
@@ -151,16 +180,16 @@ def search_vectors(*, vector: list[float], limit: int = 5, score_threshold: floa
     ]
 
 
-def delete_by_product_id(product_id: int) -> int:
-    ensure_collection()
+def delete_by_product_id(product_id: int, model_id: str | None = None) -> int:
+    ensure_collection(model_id)
     qmodels = get_models()
     get_client().delete(
-        collection_name=COLLECTION_NAME,
+        collection_name=_collection_name(model_id),
         points_selector=qmodels.FilterSelector(
             filter=qmodels.Filter(
                 must=[qmodels.FieldCondition(key="product_id", match=qmodels.MatchValue(value=product_id))]
             )
         ),
     )
-    get_collection_mean_vector.cache_clear()
+    clear_collection_mean_vector_cache(model_id)
     return 1
