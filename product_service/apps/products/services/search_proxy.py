@@ -12,6 +12,19 @@ class SearchServiceError(RuntimeError):
     pass
 
 
+def _error_detail(exc: Exception, fallback: str) -> str:
+    if isinstance(exc, urllib_error.HTTPError):
+        try:
+            payload = json.loads(exc.read().decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload = {}
+        detail = payload.get("detail") if isinstance(payload, dict) else None
+        if detail:
+            return f"{fallback}: {detail}"
+        return f"{fallback}: HTTP {exc.code}"
+    return fallback
+
+
 def _multipart_body(fields: dict[str, str], files: dict[str, tuple[str, bytes, str]]):
     boundary = f"----wams-{uuid4().hex}"
     parts: list[bytes] = []
@@ -57,7 +70,7 @@ def index_product_image(*, product_id: int, product_image_id: int, image_name: s
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"},
         )
     except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
-        raise SearchServiceError("index request failed") from exc
+        raise SearchServiceError(_error_detail(exc, "index request failed")) from exc
 
 
 def delete_product_index(product_id: int) -> dict:
@@ -65,4 +78,4 @@ def delete_product_index(product_id: int) -> dict:
     try:
         return _json_request("DELETE", url, headers={"Accept": "application/json"})
     except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
-        raise SearchServiceError("delete request failed") from exc
+        raise SearchServiceError(_error_detail(exc, "delete request failed")) from exc

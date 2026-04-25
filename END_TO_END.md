@@ -94,13 +94,13 @@ docker compose exec main_service python manage.py demo_smoke
 Run the search-service tests:
 
 ```bash
-docker compose exec search_service env DJANGO_USE_SQLITE=1 python manage.py test apps.search.tests
+docker compose exec search_service python manage.py test apps.search.tests
 ```
 
 Run the gateway tests:
 
 ```bash
-docker compose exec main_service env DJANGO_USE_SQLITE=1 python manage.py test apps.core.tests
+docker compose exec main_service python manage.py test apps.core.tests
 ```
 
 ## 6. Optional Colab Model Import

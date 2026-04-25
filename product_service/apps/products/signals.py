@@ -10,6 +10,15 @@ from .services.search_proxy import SearchServiceError, delete_product_index, ind
 
 
 logger = logging.getLogger(__name__)
+_logged_search_unavailable: set[str] = set()
+
+
+def _log_search_unavailable_once(key: str, message: str, *args):
+    if key in _logged_search_unavailable:
+        logger.debug(message, *args)
+        return
+    _logged_search_unavailable.add(key)
+    logger.warning(message, *args)
 
 
 def _index_image_by_pk(image_pk: int):
@@ -33,7 +42,7 @@ def auto_index_product_image(sender, instance: ProductImage, created: bool, **kw
     try:
         _index_image_by_pk(instance.pk)
     except SearchServiceError:
-        logger.exception("Failed to auto-index product image %s", instance.pk)
+        _log_search_unavailable_once("index", "Search service unavailable; skipped indexing product images")
 
 
 @receiver(post_delete, sender=ProductImage)
@@ -43,7 +52,7 @@ def remove_vectors_on_image_delete(sender, instance: ProductImage, **kwargs):
         for image_pk in ProductImage.objects.filter(product_id=instance.product_id).values_list("pk", flat=True):
             _index_image_by_pk(image_pk)
     except SearchServiceError:
-        logger.exception("Failed to refresh vectors for product %s after image delete", instance.product_id)
+        _log_search_unavailable_once("refresh", "Search service unavailable; skipped vector refresh after image delete")
 
 
 @receiver(post_delete, sender=Product)
@@ -51,4 +60,4 @@ def remove_vectors_on_product_delete(sender, instance: Product, **kwargs):
     try:
         delete_product_index(instance.pk)
     except SearchServiceError:
-        logger.exception("Failed to delete vectors for product %s", instance.pk)
+        _log_search_unavailable_once("delete", "Search service unavailable; skipped vector deletes")

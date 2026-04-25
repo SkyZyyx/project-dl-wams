@@ -121,6 +121,7 @@ class Command(BaseCommand):
         categories: dict[str, Category] = {}
         created_products = 0
         created_images = 0
+        unindexed_images = 0
 
         for item in items:
             if created_products >= target_products:
@@ -148,9 +149,7 @@ class Command(BaseCommand):
             image.refresh_from_db()
 
             if not image.indexed or not image.qdrant_id:
-                product.delete()
-                image.delete()
-                continue
+                unindexed_images += 1
 
             created_products += 1
             created_images += 1
@@ -165,3 +164,9 @@ class Command(BaseCommand):
                 f"Seeded {len(categories)} categories, {created_products} products, and {created_images} images from {dataset_root}."
             )
         )
+        if unindexed_images:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{unindexed_images} images were not indexed because the search service was unavailable."
+                )
+            )

@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from .services.search_proxy import SearchServiceError, proxy_gradcam_image, proxy_search_image_with_threshold
 
-from .services.catalog_proxy import CatalogServiceError, fetch_products_by_ids
+from .services.catalog_proxy import CatalogServiceError, fetch_products, fetch_products_by_ids
 
 
 @api_view(["GET"])
@@ -101,6 +101,21 @@ class SearchView(APIView):
 
         hydrated_matches.sort(key=lambda item: item.get("score", 0), reverse=True)
         return Response({"matches": hydrated_matches})
+
+
+class ProductListView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        ids = request.query_params.get("ids")
+        product_ids = None
+        if ids:
+            product_ids = [int(value) for value in ids.split(",") if value.strip().isdigit()]
+
+        try:
+            return Response(fetch_products(product_ids))
+        except CatalogServiceError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
 class GradCamView(APIView):
