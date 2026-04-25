@@ -41,6 +41,36 @@ docker compose exec product_service python manage.py seed_demo
 This step can take a while the first time because it downloads the demo dataset.
 The seeder now pulls `jutrera/stanford-car-dataset-by-classes-folder` through KaggleHub.
 
+### Kaggle Credentials (Required For Seeding)
+
+KaggleHub downloads from Kaggle, so the `product_service` container needs Kaggle credentials.
+
+Option A (recommended): export env vars on your machine, then start Docker:
+
+```bash
+export KAGGLE_USERNAME="your_kaggle_username"
+export KAGGLE_KEY="your_kaggle_api_key"
+docker compose up -d --build
+docker compose exec product_service python manage.py seed_demo
+```
+
+Option B: mount a `kaggle.json` into the container:
+
+1. Create `~/.kaggle/kaggle.json` on your machine (from Kaggle Account -> API -> Create New Token).
+2. Add a volume mapping in `docker-compose.yml` for `product_service`:
+
+```yaml
+volumes:
+  - ~/.kaggle/kaggle.json:/root/.kaggle/kaggle.json:ro
+```
+
+Then run:
+
+```bash
+docker compose up -d --build
+docker compose exec product_service python manage.py seed_demo
+```
+
 ## 4. Verify The Stack
 
 Open these URLs:
