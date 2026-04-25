@@ -305,6 +305,13 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(len({spec.collection_name for spec in registry.values()}), len(registry))
         self.assertTrue(all(spec.vector_size > 0 for spec in registry.values()))
         self.assertEqual(get_model_spec().model_id, "dinov2_base_pretrained")
+        self.assertIsNone(get_model_spec("dinov2_base_pretrained").checkpoint_path)
+
+    @override_settings(DINOv2_FINETUNED_CHECKPOINT_PATH="/tmp/colab-model.pt")
+    def test_model_registry_exposes_checkpoint_paths(self):
+        from .services.model_registry import get_model_spec
+
+        self.assertEqual(get_model_spec("dinov2_base_finetuned").checkpoint_path, "/tmp/colab-model.pt")
 
     def test_get_embedder_caches_per_model_family(self):
         from .services.embedder import get_embedder

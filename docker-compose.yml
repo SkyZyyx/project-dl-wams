@@ -1,14 +1,62 @@
 services:
-  postgres:
+  postgres_users:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-wams}
+      POSTGRES_DB: ${POSTGRES_USERS_DB:-postgres_users}
       POSTGRES_USER: ${POSTGRES_USER:-wams}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_users_data:/var/lib/postgresql/data
     ports:
-    - "5432:5432"
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wams}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres_products:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_PRODUCTS_DB:-postgres_products}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+    volumes:
+      - postgres_products_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wams}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres_orders:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_ORDERS_DB:-postgres_orders}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+    volumes:
+      - postgres_orders_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wams}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres_search:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_SEARCH_DB:-postgres_search}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+    volumes:
+      - postgres_search_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wams}"]
       interval: 5s
@@ -29,43 +77,120 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${MAIN_DJANGO_SECRET_KEY:-dev-main-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,main_service,nginx}
-      POSTGRES_DB: ${POSTGRES_DB:-wams}
-      POSTGRES_USER: ${POSTGRES_USER:-wams}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL:-http://searchservice:8001}
-      SEARCH_SERVICE_TIMEOUT_SECONDS: ${SEARCH_SERVICE_TIMEOUT_SECONDS:-300}
-      MEDIA_ROOT: /app/media
-      MEDIA_URL: /media/
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,mainservice,nginx,userservice,productservice,orderservice,searchservice}
+      DJANGO_USE_SQLITE: "1"
+      PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL:-http://productservice:8002}
+      SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL:-http://searchservice:8004}
+      SEARCH_SERVICE_TIMEOUT_SECONDS: ${SEARCH_SERVICE_TIMEOUT_SECONDS:-10}
+      UPSTREAM_TIMEOUT_SECONDS: ${UPSTREAM_TIMEOUT_SECONDS:-10}
     volumes:
       - ./main_service:/app
-      - media_data:/app/media
     networks:
       default:
         aliases:
           - mainservice
-    depends_on:
-      postgres:
-        condition: service_healthy
-      search_service:
-        condition: service_started
     ports:
       - "8000:8000"
+
+  user_service:
+    build:
+      context: ./user_service
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8001"
+    environment:
+      DJANGO_SECRET_KEY: ${USER_DJANGO_SECRET_KEY:-dev-user-secret}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,userservice,nginx}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-shared-jwt-key}
+      POSTGRES_DB: ${POSTGRES_USERS_DB:-postgres_users}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+      POSTGRES_HOST: postgres_users
+      POSTGRES_PORT: 5432
+      MEDIA_ROOT: /app/media
+      MEDIA_URL: /media/
+    volumes:
+      - ./user_service:/app
+    networks:
+      default:
+        aliases:
+          - userservice
+    depends_on:
+      postgres_users:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+
+  product_service:
+    build:
+      context: ./product_service
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8002"
+    environment:
+      DJANGO_SECRET_KEY: ${PRODUCT_DJANGO_SECRET_KEY:-dev-product-secret}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,productservice,nginx}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-shared-jwt-key}
+      POSTGRES_DB: ${POSTGRES_PRODUCTS_DB:-postgres_products}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+      POSTGRES_HOST: postgres_products
+      POSTGRES_PORT: 5432
+      SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL:-http://searchservice:8004}
+      SEARCH_SERVICE_TIMEOUT_SECONDS: ${SEARCH_SERVICE_TIMEOUT_SECONDS:-10}
+      MEDIA_ROOT: /app/media
+      MEDIA_URL: /media/
+    volumes:
+      - ./product_service:/app
+      - media_data:/app/media
+    networks:
+      default:
+        aliases:
+          - productservice
+    depends_on:
+      postgres_products:
+        condition: service_healthy
+    ports:
+      - "8002:8002"
+
+  order_service:
+    build:
+      context: ./order_service
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8003"
+    environment:
+      DJANGO_SECRET_KEY: ${ORDER_DJANGO_SECRET_KEY:-dev-order-secret}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,orderservice,nginx}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:-dev-shared-jwt-key}
+      POSTGRES_DB: ${POSTGRES_ORDERS_DB:-postgres_orders}
+      POSTGRES_USER: ${POSTGRES_USER:-wams}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
+      POSTGRES_HOST: postgres_orders
+      POSTGRES_PORT: 5432
+      PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL:-http://productservice:8002}
+      PRODUCT_SERVICE_TIMEOUT_SECONDS: ${PRODUCT_SERVICE_TIMEOUT_SECONDS:-10}
+    volumes:
+      - ./order_service:/app
+    networks:
+      default:
+        aliases:
+          - orderservice
+    depends_on:
+      postgres_orders:
+        condition: service_healthy
+    ports:
+      - "8003:8003"
 
   search_service:
     build:
       context: ./search_service
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8001"
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8004"
     environment:
       DJANGO_SECRET_KEY: ${SEARCH_DJANGO_SECRET_KEY:-dev-search-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,search_service,nginx}
-      POSTGRES_DB: ${POSTGRES_DB:-wams}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,searchservice,nginx}
+      POSTGRES_DB: ${POSTGRES_SEARCH_DB:-postgres_search}
       POSTGRES_USER: ${POSTGRES_USER:-wams}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wams}
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: postgres_search
       POSTGRES_PORT: 5432
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       MAIN_SERVICE_URL: ${MAIN_SERVICE_URL:-http://mainservice:8000}
@@ -75,23 +200,27 @@ services:
       SEARCH_PREPROCESS_THRESHOLD: ${SEARCH_PREPROCESS_THRESHOLD:-24}
       SEARCH_PREPROCESS_MIN_AREA_RATIO: ${SEARCH_PREPROCESS_MIN_AREA_RATIO:-0.01}
       SEARCH_OOD_COSINE_THRESHOLD: ${SEARCH_OOD_COSINE_THRESHOLD:-0.35}
+      DINOv2_TRANSFER_CHECKPOINT_PATH: ${DINOv2_TRANSFER_CHECKPOINT_PATH:-}
+      DINOv2_FINETUNED_CHECKPOINT_PATH: ${DINOv2_FINETUNED_CHECKPOINT_PATH:-}
+      CLIP_VIT_B32_CHECKPOINT_PATH: ${CLIP_VIT_B32_CHECKPOINT_PATH:-}
       SEARCH_COLLECTION_SCROLL_LIMIT: ${SEARCH_COLLECTION_SCROLL_LIMIT:-256}
       MEDIA_ROOT: /app/media
       MEDIA_URL: /media/
     volumes:
       - ./search_service:/app
       - media_data:/app/media
+      - ./models:/models
     networks:
       default:
         aliases:
           - searchservice
     depends_on:
-      postgres:
+      postgres_search:
         condition: service_healthy
       qdrant:
         condition: service_started
     ports:
-      - "8001:8001"
+      - "8004:8004"
 
   nginx:
     image: nginx:1.27-alpine
@@ -104,6 +233,9 @@ services:
       - media_data:/media:ro
 
 volumes:
-  postgres_data:
+  postgres_users_data:
+  postgres_products_data:
+  postgres_orders_data:
+  postgres_search_data:
   qdrant_data:
   media_data:

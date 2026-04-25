@@ -5,12 +5,21 @@ from dataclasses import dataclass
 from django.conf import settings
 
 
+def _optional_path_setting(name: str) -> str | None:
+    value = getattr(settings, name, "")
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
+
+
 @dataclass(frozen=True)
 class ModelSpec:
     model_id: str
     label: str
     family: str
     source: str
+    checkpoint_path: str | None
     vector_size: int
     collection_name: str
     gradcam_supported: bool
@@ -24,6 +33,7 @@ def _build_registry() -> dict[str, ModelSpec]:
             label="CLIP ViT-B/32 (pretrained, no fine-tune)",
             family="clip",
             source=getattr(settings, "CLIP_VIT_B32_SOURCE", "openai/clip-vit-base-patch32"),
+            checkpoint_path=_optional_path_setting("CLIP_VIT_B32_CHECKPOINT_PATH"),
             vector_size=512,
             collection_name="product_images_clip_vit_b32_pretrained",
             gradcam_supported=False,
@@ -33,6 +43,7 @@ def _build_registry() -> dict[str, ModelSpec]:
             label="DINOv2-base (pretrained, no fine-tune)",
             family="dinov2",
             source=dinov2_pretrained_source,
+            checkpoint_path=None,
             vector_size=768,
             collection_name="product_images_dinov2_base_pretrained",
             gradcam_supported=True,
@@ -42,6 +53,7 @@ def _build_registry() -> dict[str, ModelSpec]:
             label="DINOv2-base + transfer learning",
             family="dinov2",
             source=getattr(settings, "DINOv2_TRANSFER_SOURCE", dinov2_pretrained_source),
+            checkpoint_path=_optional_path_setting("DINOv2_TRANSFER_CHECKPOINT_PATH"),
             vector_size=768,
             collection_name="product_images_dinov2_base_transfer",
             gradcam_supported=True,
@@ -51,6 +63,7 @@ def _build_registry() -> dict[str, ModelSpec]:
             label="DINOv2-base fine-tuned",
             family="dinov2",
             source=getattr(settings, "DINOv2_FINETUNED_SOURCE", dinov2_pretrained_source),
+            checkpoint_path=_optional_path_setting("DINOv2_FINETUNED_CHECKPOINT_PATH"),
             vector_size=768,
             collection_name="product_images_dinov2_base_finetuned",
             gradcam_supported=True,

@@ -64,3 +64,6 @@ The combined compare command also writes:
 - Validation/test queries are only created for products with at least two images.
 - Product-level and subcategory-level metrics are both computed.
 - The transfer-learning and fine-tuning variants use DINOv2 with a trainable projection head and batch-hard triplet loss.
+- If you trained a model in Colab, export either:
+  - a Hugging Face-style folder with `save_pretrained(...)`, then set `DINOv2_FINETUNED_SOURCE` or `CLIP_VIT_B32_SOURCE` to that local path, or
+  - a PyTorch checkpoint, then set `DINOv2_FINETUNED_CHECKPOINT_PATH` / `DINOv2_TRANSFER_CHECKPOINT_PATH` / `CLIP_VIT_B32_CHECKPOINT_PATH` before starting Docker.

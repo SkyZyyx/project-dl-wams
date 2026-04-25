@@ -1,0 +1,11 @@
+.env
+.codex
+.codex/
+
+**/__pycache__/
+**/*.py[cod]
+
+**/.demo_dataset_cache/
+**/*.sqlite3
+
+.DS_Store

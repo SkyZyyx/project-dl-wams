@@ -5,9 +5,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.products.models import Product
-from apps.products.serializers import ProductSerializer
-from apps.products.services.search_proxy import SearchServiceError, proxy_gradcam_image, proxy_search_image_with_threshold
+from .services.search_proxy import SearchServiceError, proxy_gradcam_image, proxy_search_image_with_threshold
+
+from .services.catalog_proxy import CatalogServiceError, fetch_products_by_ids
 
 
 @api_view(["GET"])
@@ -75,8 +75,12 @@ class SearchView(APIView):
             if product_id not in product_ids:
                 product_ids.append(product_id)
 
-        products = Product.objects.filter(id__in=product_ids).select_related("category").prefetch_related("images")
-        products_by_id = {product.id: product for product in products}
+        try:
+            products_payload = fetch_products_by_ids(product_ids)
+        except CatalogServiceError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+        products_by_id = {int(product["id"]): product for product in products_payload if product.get("id") is not None}
 
         hydrated_matches = []
         for product_id in product_ids:
@@ -85,7 +89,7 @@ class SearchView(APIView):
             if product is None or match is None:
                 continue
 
-            product_data = ProductSerializer(product, context={"request": request}).data
+            product_data = dict(product)
             product_data.update(
                 {
                     "score": match["score"],

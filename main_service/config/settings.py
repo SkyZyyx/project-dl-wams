@@ -11,7 +11,8 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
-        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,mainservice,nginx"
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1,testserver,mainservice,nginx,userservice,productservice,orderservice,searchservice",
     ).split(",")
     if host.strip()
 ]
@@ -26,8 +27,6 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.core",
     "apps.users",
-    "apps.products.apps.ProductsConfig",
-    "apps.orders",
 ]
 
 MIDDLEWARE = [
@@ -63,7 +62,7 @@ ASGI_APPLICATION = "config.asgi.application"
 
 DATABASES = (
     {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "test.sqlite3"}}
-    if os.getenv("DJANGO_USE_SQLITE", "0") == "1"
+    if os.getenv("DJANGO_USE_SQLITE", "1") == "1"
     else {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
@@ -86,15 +85,10 @@ USE_TZ = True
 STATIC_URL = "/static/"
 MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
-SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://searchservice:8001")
-SEARCH_SERVICE_TIMEOUT_SECONDS = int(os.getenv("SEARCH_SERVICE_TIMEOUT_SECONDS", "300"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
@@ -103,4 +97,10 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "SIGNING_KEY": os.getenv("JWT_SIGNING_KEY", SECRET_KEY),
 }
+
+PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://productservice:8002")
+SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://searchservice:8004")
+SEARCH_SERVICE_TIMEOUT_SECONDS = float(os.getenv("SEARCH_SERVICE_TIMEOUT_SECONDS", "10"))
+UPSTREAM_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "10"))

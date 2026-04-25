@@ -3,11 +3,8 @@ from io import BytesIO
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management.base import BaseCommand, CommandError
-from django.core.management import call_command
+from django.core.management import BaseCommand, CommandError, call_command
 from django.test import Client
-
-from apps.products.models import Category, Product, ProductImage
 
 
 def make_image_file(name: str = "smoke.png", size: tuple[int, int] = (128, 128), color=(120, 60, 30)):
@@ -20,28 +17,12 @@ def make_image_file(name: str = "smoke.png", size: tuple[int, int] = (128, 128),
 
 
 class Command(BaseCommand):
-    help = "Run the milestone 8 demo smoke check."
+    help = "Run the gateway smoke check."
 
     def handle(self, *args, **options):
         call_command("migrate", interactive=False, verbosity=0)
 
         client = Client()
-        image = make_image_file()
-
-        category, _ = Category.objects.get_or_create(name="Smoke")
-        product, _ = Product.objects.get_or_create(
-            name="Smoke Product",
-            category=category,
-            defaults={"description": "", "price": "9.99"},
-        )
-
-        with patch("apps.products.signals.index_product_image") as mock_index_product_image:
-            mock_index_product_image.return_value = {"qdrant_id": "smoke-qdrant"}
-            product_image = ProductImage.objects.create(product=product, image=image, is_primary=True)
-
-        product_image.refresh_from_db()
-        if not product_image.indexed:
-            raise CommandError("product image was not indexed during smoke setup")
 
         home_response = client.get("/")
         if home_response.status_code != 200:
@@ -51,17 +32,27 @@ class Command(BaseCommand):
         if response.status_code != 200:
             raise CommandError(f"demo page failed: {response.status_code}")
 
-        with patch("apps.core.views.proxy_search_image_with_threshold") as mock_search_proxy:
+        with patch("apps.core.views.proxy_search_image_with_threshold") as mock_search_proxy, patch(
+            "apps.core.views.fetch_products_by_ids"
+        ) as mock_fetch_products_by_ids:
             mock_search_proxy.return_value = {
                 "matches": [
                     {
-                        "product_id": product.id,
-                        "product_image_id": product_image.id,
+                        "product_id": 101,
+                        "product_image_id": 7,
                         "qdrant_id": "abc",
                         "score": 0.93,
                     }
                 ]
             }
+            mock_fetch_products_by_ids.return_value = [
+                {
+                    "id": 101,
+                    "name": "Smoke Product",
+                    "price": "9.99",
+                    "category": {"id": 1, "name": "Smoke", "slug": "smoke"},
+                }
+            ]
             search_response = client.post(
                 "/api/search/",
                 {"image": make_image_file(name="query.png"), "score_threshold": "0.40"},
@@ -70,7 +61,8 @@ class Command(BaseCommand):
         if search_response.status_code != 200:
             raise CommandError(f"search endpoint failed: {search_response.status_code}")
 
-        if not json.loads(search_response.content.decode("utf-8")).get("matches"):
+        matches = json.loads(search_response.content.decode("utf-8")).get("matches")
+        if not matches:
             raise CommandError("search endpoint returned no matches")
 
         with patch("apps.core.views.proxy_gradcam_image") as mock_gradcam_proxy:
@@ -80,4 +72,4 @@ class Command(BaseCommand):
         if gradcam_response.status_code != 200:
             raise CommandError(f"gradcam endpoint failed: {gradcam_response.status_code}")
 
-        self.stdout.write(self.style.SUCCESS("demo smoke check passed"))
+        self.stdout.write(self.style.SUCCESS("gateway smoke check passed"))

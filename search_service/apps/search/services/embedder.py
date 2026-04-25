@@ -4,6 +4,7 @@ from io import BytesIO
 from PIL import Image
 
 from .model_registry import get_model_spec
+from .notebook_artifacts import ClipNotebookEmbedder, DinoNotebookEmbedder
 
 
 class BaseImageEmbedder:
@@ -12,6 +13,7 @@ class BaseImageEmbedder:
         self.model_id = spec.model_id
         self.family = spec.family
         self.source = spec.source
+        self.checkpoint_path = spec.checkpoint_path
         self.vector_size = spec.vector_size
         self.gradcam_supported = spec.gradcam_supported
         self._loaded = False
@@ -33,11 +35,10 @@ class DINOv2Embedder(BaseImageEmbedder):
             return
 
         import torch
-        from transformers import AutoImageProcessor, AutoModel
 
         self._torch = torch
-        self.processor = AutoImageProcessor.from_pretrained(self.source)
-        self.model = AutoModel.from_pretrained(self.source)
+        self.model = DinoNotebookEmbedder(self.source, self.checkpoint_path)
+        self.processor = self.model.processor
         self.model.eval()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
@@ -48,13 +49,8 @@ class DINOv2Embedder(BaseImageEmbedder):
 
         torch = self._torch
         image = self._prepare_image(image_bytes)
-        inputs = self.processor(images=image, return_tensors="pt")
-        inputs = {key: value.to(self.device) for key, value in inputs.items()}
-
         with torch.inference_mode():
-            outputs = self.model(**inputs)
-            pooled = outputs.last_hidden_state[:, 0, :]
-            vector = self._normalize_vector(pooled)
+            vector = self.model.encode_pil_images([image]).to(self.device)
         return vector[0].cpu().tolist()
 
 
@@ -64,11 +60,10 @@ class CLIPImageEmbedder(BaseImageEmbedder):
             return
 
         import torch
-        from transformers import AutoProcessor, CLIPVisionModelWithProjection
 
         self._torch = torch
-        self.processor = AutoProcessor.from_pretrained(self.source)
-        self.model = CLIPVisionModelWithProjection.from_pretrained(self.source)
+        self.model = ClipNotebookEmbedder(self.source, self.checkpoint_path)
+        self.processor = self.model.processor
         self.model.eval()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
@@ -79,12 +74,8 @@ class CLIPImageEmbedder(BaseImageEmbedder):
 
         torch = self._torch
         image = self._prepare_image(image_bytes)
-        inputs = self.processor(images=image, return_tensors="pt")
-        inputs = {key: value.to(self.device) for key, value in inputs.items()}
-
         with torch.inference_mode():
-            outputs = self.model(**inputs)
-            vector = self._normalize_vector(outputs.image_embeds)
+            vector = self.model.encode_pil_images([image]).to(self.device)
         return vector[0].cpu().tolist()
 
 
