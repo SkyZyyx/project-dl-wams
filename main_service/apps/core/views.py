@@ -5,9 +5,15 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .permissions import SellerOrAdminWritePermission
 from .services.search_proxy import SearchServiceError, proxy_gradcam_image, proxy_search_image_with_threshold
 
-from .services.catalog_proxy import CatalogServiceError, fetch_products, fetch_products_by_ids
+from .services.catalog_proxy import CatalogServiceError, fetch_products, fetch_products_by_ids, proxy_catalog_write
+
+
+def _catalog_error_response(exc: CatalogServiceError):
+    payload = exc.payload if exc.payload is not None else {"detail": exc.detail}
+    return Response(payload, status=exc.status_code)
 
 
 @api_view(["GET"])
@@ -104,7 +110,7 @@ class SearchView(APIView):
 
 
 class ProductListView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [SellerOrAdminWritePermission]
 
     def get(self, request):
         ids = request.query_params.get("ids")
@@ -116,6 +122,67 @@ class ProductListView(APIView):
             return Response(fetch_products(product_ids))
         except CatalogServiceError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+    def post(self, request):
+        authorization = request.headers.get("Authorization")
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="POST",
+                path="/api/products/",
+                body=request.body,
+                content_type=request.META.get("CONTENT_TYPE", "application/json"),
+                authorization=authorization,
+            )
+            return Response(payload, status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
+
+
+class ProductCategoryView(APIView):
+    permission_classes = [SellerOrAdminWritePermission]
+
+    def get(self, request):
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="GET",
+                path="/api/categories/",
+                body=b"",
+                content_type="application/json",
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
+
+    def post(self, request):
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="POST",
+                path="/api/categories/",
+                body=request.body,
+                content_type=request.META.get("CONTENT_TYPE", "application/json"),
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
+
+
+class ProductImageUploadView(APIView):
+    permission_classes = [SellerOrAdminWritePermission]
+
+    def post(self, request, pk: int):
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="POST",
+                path=f"/api/products/{pk}/images/",
+                body=request.body,
+                content_type=request.META.get("CONTENT_TYPE", "multipart/form-data"),
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
 
 
 class GradCamView(APIView):

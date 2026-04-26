@@ -49,7 +49,7 @@ Option A (recommended): export env vars on your machine, then start Docker:
 
 ```bash
 export KAGGLE_USERNAME="your_kaggle_username"
-export KAGGLE_KEY="your_kaggle_api_key"
+export KAGGLE_API_TOKEN="your_kaggle_api_token"
 docker compose up -d --build
 docker compose exec product_service python manage.py seed_demo
 ```
@@ -70,6 +70,8 @@ Then run:
 docker compose up -d --build
 docker compose exec product_service python manage.py seed_demo
 ```
+
+The seed command now builds one product from each 5-image chunk of the dataset, so each seeded product carries multiple angles instead of a single photo.
 
 ## 4. Verify The Stack
 

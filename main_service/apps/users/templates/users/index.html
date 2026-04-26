@@ -1,102 +1,47 @@
 {% extends "users/base.html" %}
 
-{% block title %}WAMS | Image-first storefront{% endblock %}
+{% block title %}Apex Motors | Buy cars online{% endblock %}
 
 {% block content %}
-<section class="hero">
-    <div>
-        <p class="eyebrow">Image-first commerce</p>
-        <h1>Upload a picture. Shop by instinct.</h1>
-        <p class="lede">Search the catalog through <code>main_service</code> with a single drag-and-drop gesture. The search service stays behind the curtain; this front end only speaks to the API you own.</p>
-        <div class="hero-actions">
-            <a class="button" href="#search-panel">Start a search</a>
-            <a class="button secondary" href="/demo/">Open the lab</a>
-            <a class="ghost-button" href="#catalog-panel">Browse inventory</a>
-        </div>
-    </div>
-
-    <aside class="status-card" aria-live="polite">
-        <div class="section-label">System status</div>
-        <div class="status-grid">
-            <div class="status-item" id="health-status">
-                <strong>Checking main_service</strong>
-                <span>Loading health and database status.</span>
-            </div>
-            <div class="status-item" id="search-status-card">
-                <strong>Search ready</strong>
-                <span>POST /api/search/ accepts multipart image uploads.</span>
-            </div>
-            <div class="status-item" id="catalog-status-card">
-                <strong>Catalog fallback</strong>
-                <span>Browse products if no image is uploaded.</span>
-            </div>
-        </div>
-        <p class="hero-note">One vivid accent. Near-monochrome canvas. Product results are hydrated by <code>main_service</code> before rendering.</p>
-    </aside>
-</section>
-
-<section class="grid-2" id="search-panel">
-    <div class="panel">
-        <div class="panel-head">
-            <div>
-                <p class="card-label">Search</p>
-                <h3>Drop an image or tap the canvas.</h3>
-            </div>
-            <span class="pill" id="selected-file-pill">No file chosen</span>
-        </div>
-
-        <label class="dropzone" id="search-dropzone">
-            <input id="search-image" type="file" accept="image/*">
-            <p class="dropzone-title">Search visually, not verbally.</p>
-            <p class="dropzone-copy">Drag a photo here, browse a screenshot, or use the file picker. The storefront will send the file as multipart form data to <code>/api/search/</code>.</p>
-            <span class="pill">Primary CTA</span>
-        </label>
-
-        <div class="slider-row">
-            <div class="control-label">
-                <span>Confidence threshold</span>
-                <output id="threshold-value">0.40</output>
-            </div>
-            <input id="search-threshold" type="range" min="0" max="1" step="0.01" value="0.40" aria-label="Confidence threshold">
-            <div class="range-meta">
-                <span>Lower values widen the net.</span>
-                <span>Higher values sharpen the match.</span>
-            </div>
-        </div>
-
-        <div class="form-actions">
-            <button class="button" id="run-search" type="button">Search catalog</button>
-            <button class="ghost-button" id="clear-search" type="button">Clear image</button>
-        </div>
-
-        <div class="notice" id="search-status" data-tone="info">Drop an image to begin.</div>
-    </div>
-
-    <div class="panel" id="catalog-panel">
-        <div class="panel-head">
-            <div>
-                <p class="card-label">Browse fallback</p>
-                <h3>Catalog, even without a query.</h3>
-            </div>
-            <a class="card-link" href="/demo/">Lab mode</a>
-        </div>
-
-        <div class="notice" id="catalog-status" data-tone="info">Loading products from <code>/api/products/</code>.</div>
-        <div class="product-grid" id="catalog-results" aria-live="polite"></div>
-    </div>
-</section>
-
-<section class="section" id="results-panel">
-    <div class="section-head">
+<section class="market-shell" aria-label="Apex Motors marketplace">
+    <header class="market-hero">
         <div>
-            <p class="section-label">Matches</p>
-            <h2>Results hydrated by main_service.</h2>
-            <p class="section-copy">Each card below is a real product object returned by <code>/api/search/</code>. No direct search-service calls from the browser.</p>
+            <p class="eyebrow">Apex Motors</p>
+            <h1>Cars for sale, auction energy.</h1>
         </div>
-        <span class="pill" id="result-count">0 results</span>
-    </div>
 
-    <div class="product-grid" id="search-results" aria-live="polite"></div>
+    </header>
+
+
+
+    <div class="commerce-board">
+        <aside class="auction-rail">
+            <div class="rail-block">
+                <span>Inventory</span>
+                <strong id="inventory-count">Loading</strong>
+            </div>
+            <div class="rail-block">
+                <span>Buying mode</span>
+                <strong>Buy it now</strong>
+            </div>
+            <div class="rail-block">
+                <span>Delivery</span>
+                <strong>Nationwide</strong>
+            </div>
+        </aside>
+
+        <section class="inventory-column" aria-label="All cars">
+            <div class="inventory-grid" id="inventory-grid" aria-live="polite"></div>
+        </section>
+
+        <aside class="listing-panel" id="listing-panel" aria-label="Selected car">
+            <div class="listing-empty">
+                <span>Select</span>
+                <strong>Pick a car</strong>
+                <p>The listing opens here with photos, price, specs, and purchase form.</p>
+            </div>
+        </aside>
+    </div>
 </section>
 {% endblock %}
 
@@ -104,137 +49,214 @@
 <script>
     (function () {
         window.__wamsInit(function (ui) {
-            var imageInput = document.getElementById("search-image");
-            var dropzone = document.getElementById("search-dropzone");
-            var threshold = document.getElementById("search-threshold");
-            var thresholdValue = document.getElementById("threshold-value");
-            var runButton = document.getElementById("run-search");
-            var clearButton = document.getElementById("clear-search");
-            var searchStatus = document.getElementById("search-status");
-            var catalogStatus = document.getElementById("catalog-status");
-            var healthStatus = document.getElementById("health-status");
-            var searchResults = document.getElementById("search-results");
-            var catalogResults = document.getElementById("catalog-results");
-            var resultCount = document.getElementById("result-count");
-            var selectedFilePill = document.getElementById("selected-file-pill");
+            var grid = document.getElementById("inventory-grid");
+            var panel = document.getElementById("listing-panel");
+            var count = document.getElementById("inventory-count");
+            var inventory = [];
+            var selectedId = null;
 
-            var currentFile = null;
-
-            function updateThreshold() {
-                thresholdValue.textContent = Number(threshold.value).toFixed(2);
-            }
-
-            function setSelectedFile(file) {
-                currentFile = file || null;
-                selectedFilePill.textContent = currentFile ? currentFile.name : "No file chosen";
-                dropzone.classList.toggle("is-active", !!currentFile);
-            }
-
-            function setSearchState(tone, title, detail) {
-                ui.setStatus(searchStatus, tone, title, detail);
-            }
-
-            function setCatalogState(tone, title, detail) {
-                ui.setStatus(catalogStatus, tone, title, detail);
-            }
-
-            function setHealthState(tone, title, detail) {
-                ui.setStatus(healthStatus, tone, title, detail);
-            }
-
-            imageInput.addEventListener("change", function () {
-                setSelectedFile(imageInput.files && imageInput.files[0]);
-            });
-
-            dropzone.addEventListener("dragover", function (event) {
-                event.preventDefault();
-                dropzone.classList.add("is-active");
-            });
-
-            dropzone.addEventListener("dragleave", function (event) {
-                if (dropzone.contains(event.relatedTarget)) {
-                    return;
+            var fallbackInventory = [
+                {
+                    id: "A90",
+                    name: "Toyota Supra GR Launch",
+                    price: 52900,
+                    description: "Turbo coupe, black leather, adaptive suspension, clean title.",
+                    category: { name: "coupe" },
+                    year: "2024",
+                    mileage: "3,120 mi",
+                    transmission: "Automatic",
+                    fuel_type: "Gasoline",
+                    drivetrain: "RWD",
+                    condition: "Excellent",
+                    images: [
+                        { image_url: "https://images.unsplash.com/photo-1619405399517-d7fce0f13302?auto=format&fit=crop&w=1200&q=80" },
+                        { image_url: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=1200&q=80" },
+                        { image_url: "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=1200&q=80" }
+                    ]
+                },
+                {
+                    id: "EQS",
+                    name: "Mercedes EQS 580",
+                    price: 86900,
+                    description: "Electric luxury sedan with executive rear package and hyperscreen.",
+                    category: { name: "ev luxury" },
+                    year: "2023",
+                    mileage: "8,700 mi",
+                    transmission: "Single speed",
+                    fuel_type: "Electric",
+                    drivetrain: "AWD",
+                    condition: "Certified",
+                    images: [
+                        { image_url: "https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=1200&q=80" },
+                        { image_url: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=1200&q=80" }
+                    ]
+                },
+                {
+                    id: "DEF",
+                    name: "Land Rover Defender 110",
+                    price: 74400,
+                    description: "Adventure build, roof rack, tow package, cold climate kit.",
+                    category: { name: "suv" },
+                    year: "2022",
+                    mileage: "18,440 mi",
+                    transmission: "Automatic",
+                    fuel_type: "Gasoline",
+                    drivetrain: "4WD",
+                    condition: "Very good",
+                    images: [
+                        { image_url: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1200&q=80" },
+                        { image_url: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80" }
+                    ]
+                },
+                {
+                    id: "911",
+                    name: "Porsche 911 Carrera S",
+                    price: 128500,
+                    description: "Sport chrono, chalk paint, center-lock wheels, low mileage.",
+                    category: { name: "coupe luxury" },
+                    year: "2021",
+                    mileage: "6,980 mi",
+                    transmission: "PDK",
+                    fuel_type: "Gasoline",
+                    drivetrain: "RWD",
+                    condition: "Collector grade",
+                    images: [
+                        { image_url: "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=1200&q=80" },
+                        { image_url: "https://images.unsplash.com/photo-1494905998402-395d579af36f?auto=format&fit=crop&w=1200&q=80" }
+                    ]
                 }
-                dropzone.classList.toggle("is-active", !!currentFile);
-            });
+            ];
 
-            dropzone.addEventListener("drop", function (event) {
-                var file;
-                event.preventDefault();
-                dropzone.classList.remove("is-active");
-                file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
-                if (file) {
-                    setSelectedFile(file);
-                }
-            });
+            function categoryText(product) {
+                return product.category && product.category.name ? String(product.category.name).toLowerCase() : "";
+            }
 
-            threshold.addEventListener("input", updateThreshold);
-            clearButton.addEventListener("click", function () {
-                imageInput.value = "";
-                setSelectedFile(null);
-                setSearchState("info", "Image cleared", "Upload another file to run a new search.");
-            });
-
-            runButton.addEventListener("click", async function () {
-                if (!currentFile) {
-                    setSearchState("error", "Choose an image first", "Drop a file above or use the file picker.");
-                    return;
-                }
-
-                runButton.disabled = true;
-                runButton.textContent = "Searching";
-                setSearchState("info", "Searching catalog", "Multipart image upload in flight through main_service.");
-
-                try {
-                    var payload = await ui.searchWithImage(currentFile, threshold.value);
-                    var matches = payload.matches || [];
-
-                    resultCount.textContent = matches.length + " result" + (matches.length === 1 ? "" : "s");
-                    ui.renderProductGrid(searchResults, matches, {
-                        showScore: true,
-                        featured: true,
-                        emptyMessage: payload.detail || "No matches returned for this image."
-                    });
-
-                    if (matches.length) {
-                        setSearchState("success", matches.length + " products found", "Results are hydrated products from main_service.");
-                    } else {
-                        setSearchState("info", "No close matches", payload.detail || "Try a lower threshold or another image.");
+            function productImages(product) {
+                return (product.images || []).map(function (image) {
+                    if (image.image_url) {
+                        return image.image_url;
                     }
-                } catch (error) {
-                    resultCount.textContent = "0 results";
-                    ui.renderProductGrid(searchResults, [], { emptyMessage: "Search failed. Try again." });
-                    setSearchState("error", "Search failed", error.message);
-                } finally {
-                    runButton.disabled = false;
-                    runButton.textContent = "Search catalog";
-                }
-            });
+                    if (image.thumbnail_b64) {
+                        return "data:image/jpeg;base64," + image.thumbnail_b64;
+                    }
+                    return "";
+                }).filter(Boolean);
+            }
 
-            ui.loadHealth()
-                .then(function (payload) {
-                    setHealthState(payload.status === "ok" ? "success" : "info", "Main service " + payload.status, payload.db ? "Database reachable." : "Database degraded.");
-                })
-                .catch(function (error) {
-                    setHealthState("error", "Health check failed", error.message);
+            function renderCard(product) {
+                var images = productImages(product);
+                var image = images[0] || "";
+                var card = document.createElement("article");
+                card.className = "auction-card";
+                card.dataset.productId = product.id;
+                card.tabIndex = 0;
+                card.innerHTML = [
+                    "<div class=\"auction-photo\">" + (image ? "<img src=\"" + ui.escapeHtml(image) + "\" alt=\"" + ui.escapeHtml(product.name || "Car") + "\">" : "<div class=\"fallback\">AP</div>") + "</div>",
+                    "<div class=\"auction-body\">",
+                    "<div class=\"auction-kicker\"><span>" + ui.escapeHtml(categoryText(product) || "car") + "</span><span>" + ui.escapeHtml(String(product.year || "new")) + "</span></div>",
+                    "<h2>" + ui.escapeHtml(product.name || "Untitled car") + "</h2>",
+                    "<p>" + ui.escapeHtml(product.description || "Fresh listing, ready to inspect.") + "</p>",
+                    "<div class=\"auction-price\"><strong>" + ui.formatPrice(product.price) + "</strong><span>" + ui.escapeHtml(String(product.mileage || "Mileage on request")) + "</span></div>",
+                    "</div>"
+                ].join("");
+                card.addEventListener("click", function () {
+                    selectProduct(product);
                 });
+                card.addEventListener("keydown", function (event) {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        selectProduct(product);
+                    }
+                });
+                return card;
+            }
+
+            function renderPanel(product) {
+                var images = productImages(product);
+                var primary = images[0] || "";
+                var specs = [
+                    ["Year", product.year || "Current"],
+                    ["Mileage", product.mileage || "Ask seller"],
+                    ["Drive", product.drivetrain || "Road ready"],
+                    ["Fuel", product.fuel_type || "Listed"],
+                    ["Gearbox", product.transmission || "Automatic"],
+                    ["Condition", product.condition || "Verified"]
+                ];
+                panel.innerHTML = [
+                    "<div class=\"listing-media\">" + (primary ? "<img id=\"listing-main-image\" src=\"" + ui.escapeHtml(primary) + "\" alt=\"" + ui.escapeHtml(product.name || "Selected car") + "\">" : "<div class=\"fallback detail\">No image</div>") + "</div>",
+                    "<div class=\"listing-thumbs\">" + images.map(function (src, index) {
+                        return "<button class=\"thumb" + (index === 0 ? " is-active" : "") + "\" type=\"button\" data-src=\"" + ui.escapeHtml(src) + "\"><img src=\"" + ui.escapeHtml(src) + "\" alt=\"Gallery image " + (index + 1) + "\"></button>";
+                    }).join("") + "</div>",
+                    "<div class=\"listing-copy\">",
+                    "<p class=\"eyebrow\">Selected listing</p>",
+                    "<h2>" + ui.escapeHtml(product.name || "Untitled car") + "</h2>",
+                    "<div class=\"listing-price\">" + ui.formatPrice(product.price) + "</div>",
+                    "<p>" + ui.escapeHtml(product.description || "Contact seller for details.") + "</p>",
+                    "</div>",
+                    "<div class=\"spec-table\">" + specs.map(function (spec) {
+                        return "<div><span>" + spec[0] + "</span><strong>" + ui.escapeHtml(String(spec[1])) + "</strong></div>";
+                    }).join("") + "</div>",
+                    "<form class=\"checkout-strip\" id=\"checkout-form\">",
+                    "<label class=\"field\"><span>Name</span><input class=\"input\" name=\"name\" required></label>",
+                    "<label class=\"field\"><span>Email</span><input class=\"input\" name=\"email\" type=\"email\" required></label>",
+                    "<button class=\"button\" type=\"submit\">Buy it now</button>",
+                    "<div class=\"notice\" id=\"checkout-status\" data-tone=\"info\">Ready.</div>",
+                    "</form>"
+                ].join("");
+
+                panel.querySelectorAll(".thumb").forEach(function (button) {
+                    button.addEventListener("click", function () {
+                        var main = document.getElementById("listing-main-image");
+                        if (main) {
+                            main.src = button.dataset.src;
+                        }
+                        panel.querySelectorAll(".thumb").forEach(function (thumb) {
+                            thumb.classList.toggle("is-active", thumb === button);
+                        });
+                    });
+                });
+
+                panel.querySelector("#checkout-form").addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    ui.setStatus(document.getElementById("checkout-status"), "success", "Offer placed", "Demo purchase captured for " + (product.name || "this car") + ".");
+                });
+            }
+
+            function selectProduct(product) {
+                selectedId = String(product.id);
+                renderPanel(product);
+                grid.querySelectorAll(".auction-card").forEach(function (card) {
+                    card.classList.toggle("is-selected", card.dataset.productId === selectedId);
+                });
+            }
+
+            function renderInventory() {
+                var list = inventory;
+                grid.innerHTML = "";
+                count.textContent = list.length + " cars";
+                if (!list.length) {
+                    grid.innerHTML = "<div class=\"empty-state\">No cars match this search.</div>";
+                    return;
+                }
+                list.forEach(function (product) {
+                    grid.appendChild(renderCard(product));
+                });
+                selectProduct(list.find(function (item) {
+                    return String(item.id) === selectedId;
+                }) || list[0]);
+            }
+
+
 
             ui.loadCollection("/api/products/")
                 .then(function (items) {
-                    var preview = items.slice(0, 8);
-                    ui.renderProductGrid(catalogResults, preview, {
-                        emptyMessage: "No products yet. Add inventory in admin."
-                    });
-                    setCatalogState("success", items.length + " products available", preview.length ? "Showing a curated fallback selection." : "Catalog is currently empty.");
+                    inventory = items.length ? items : fallbackInventory;
+                    renderInventory();
                 })
-                .catch(function (error) {
-                    ui.renderProductGrid(catalogResults, [], { emptyMessage: "Browse could not load right now." });
-                    setCatalogState("error", "Catalog unavailable", error.message);
+                .catch(function () {
+                    inventory = fallbackInventory;
+                    renderInventory();
                 });
-
-            updateThreshold();
-            setSelectedFile(null);
-            setSearchState("info", "Ready for upload", "Drop a product photo or a reference image to start.");
         });
     })();
 </script>

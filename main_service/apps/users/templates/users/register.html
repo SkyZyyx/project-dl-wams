@@ -1,6 +1,6 @@
 {% extends "users/base.html" %}
 
-{% block title %}WAMS | Register{% endblock %}
+{% block title %}Apex Motors | Register{% endblock %}
 
 {% block content %}
 <section class="auth-grid">
@@ -44,6 +44,13 @@
                 <label for="password">Password</label>
                 <input class="input" id="password" name="password" type="password" minlength="8" autocomplete="new-password" required>
             </div>
+            <div class="field">
+                <label for="role">Account role</label>
+                <select class="input" id="role" name="role" required>
+                    <option value="client">Client</option>
+                    <option value="seller">Seller</option>
+                </select>
+            </div>
             <div class="form-actions">
                 <button class="button" type="submit">Register</button>
                 <a class="ghost-button" href="/">Back to shop</a>
@@ -73,7 +80,8 @@
                         email: formData.get("email"),
                         first_name: formData.get("first_name"),
                         last_name: formData.get("last_name"),
-                        password: formData.get("password")
+                        password: formData.get("password"),
+                        role: formData.get("role")
                     };
 
                     var response = await fetch("/api/auth/register/", {

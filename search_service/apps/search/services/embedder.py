@@ -4,7 +4,7 @@ from io import BytesIO
 from PIL import Image
 
 from .model_registry import get_model_spec
-from .notebook_artifacts import ClipNotebookEmbedder, DinoNotebookEmbedder
+from .notebook_artifacts import ClipNotebookEmbedder, create_dino_embedder
 
 
 class BaseImageEmbedder:
@@ -37,8 +37,9 @@ class DINOv2Embedder(BaseImageEmbedder):
         import torch
 
         self._torch = torch
-        self.model = DinoNotebookEmbedder(self.source, self.checkpoint_path)
-        self.processor = self.model.processor
+        # Auto-select HF DINO or timm triplet loader based on checkpoint signature.
+        self.model = create_dino_embedder(self.source, self.checkpoint_path, projection_dim=self.vector_size)
+        self.processor = getattr(self.model, "processor", None)
         self.model.eval()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)

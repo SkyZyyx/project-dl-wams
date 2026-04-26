@@ -8,6 +8,7 @@ from rest_framework.test import APIRequestFactory
 
 from apps.core.views import DemoPageView
 from apps.users.views import LandingPageView, LoginPageView, ProfilePageView, RegisterPageView
+from .permissions import SellerOrAdminWritePermission
 from .views import SearchView
 
 
@@ -103,3 +104,33 @@ class PageRenderTests(TestCase):
             response.render()
             content = response.content.decode("utf-8")
             self.assertIn(marker, content)
+
+
+class _FakeUser:
+    def __init__(self, *, role=None, token=None, is_authenticated=True):
+        self.role = role
+        self.token = token
+        self.is_authenticated = is_authenticated
+
+
+class GatewayPermissionTests(TestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.permission = SellerOrAdminWritePermission()
+
+    def test_write_denied_for_client_role(self):
+        request = self.factory.post("/api/products/", {"name": "x"}, format="json")
+        request.user = _FakeUser(token={"role": "client"})
+
+        allowed = self.permission.has_permission(request, None)
+
+        self.assertFalse(allowed)
+
+    def test_write_allowed_for_seller_or_admin(self):
+        seller_request = self.factory.post("/api/products/", {"name": "x"}, format="json")
+        seller_request.user = _FakeUser(token={"role": "seller"})
+        admin_request = self.factory.post("/api/products/", {"name": "x"}, format="json")
+        admin_request.user = _FakeUser(token={"role": "admin"})
+
+        self.assertTrue(self.permission.has_permission(seller_request, None))
+        self.assertTrue(self.permission.has_permission(admin_request, None))

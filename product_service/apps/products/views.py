@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Category, Product, ProductImage
+from .permissions import ProductOwnerOrAdminPermission, SellerOrAdminWritePermission
 from .serializers import (
     CategorySerializer,
     ProductImageSerializer,
@@ -16,18 +17,18 @@ from .serializers import (
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [SellerOrAdminWritePermission]
 
 
 class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [SellerOrAdminWritePermission]
 
 
 class ProductListCreateView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [SellerOrAdminWritePermission]
 
     def get_queryset(self):
         queryset = Product.objects.select_related("category").prefetch_related("images")
@@ -41,14 +42,14 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [ProductOwnerOrAdminPermission]
 
     def get_queryset(self):
         return Product.objects.select_related("category").prefetch_related("images")
 
 
 class ProductImageListCreateView(APIView):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [SellerOrAdminWritePermission]
     parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request, pk):
@@ -58,6 +59,9 @@ class ProductImageListCreateView(APIView):
 
     def post(self, request, pk):
         product = get_object_or_404(Product, pk=pk)
+        checker = ProductOwnerOrAdminPermission()
+        if not checker.has_object_permission(request, self, product):
+            return Response({"detail": "You do not have permission to modify this product."}, status=status.HTTP_403_FORBIDDEN)
         serializer = ProductImageUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         image = serializer.save(product=product)

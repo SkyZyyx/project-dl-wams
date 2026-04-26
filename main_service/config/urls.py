@@ -11,6 +11,7 @@ urlpatterns = [
     path("", LandingPageView.as_view(), name="home"),
     path("demo/", DemoPageView.as_view(), name="demo"),
     path("auth/", include("apps.users.ui_urls")),
+    path("api/auth/", include("apps.users.urls")),
     path("admin/", admin.site.urls),
     path("api/", include("apps.core.urls")),
 ]

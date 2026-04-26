@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+import os
 from pathlib import Path
 import random
 import re
+from itertools import islice
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand, CommandError, call_command
@@ -13,8 +15,10 @@ from apps.products.models import Category, Product, ProductImage
 
 
 DEMO_PREFIX = "Kaggle Cars"
-DEFAULT_PRODUCT_TARGET = 24
 DEFAULT_DATASET_ID = "jutrera/stanford-car-dataset-by-classes-folder"
+DEFAULT_IMAGES_PER_PRODUCT = 5
+MIN_IMAGES_PER_PRODUCT = 5
+MAX_IMAGES_PER_PRODUCT = 10
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,10 @@ def _slugish_name(value: str) -> str:
 
 
 def _import_kagglehub():
+    api_token = os.getenv("KAGGLE_API_TOKEN")
+    if api_token and not os.getenv("KAGGLE_KEY"):
+        os.environ["KAGGLE_KEY"] = api_token
+
     try:
         import kagglehub  # type: ignore
     except ImportError as exc:  # pragma: no cover - dependency issue
@@ -58,7 +66,17 @@ def _iter_dataset_items(dataset_root: Path) -> list[DatasetItem]:
     return items
 
 
+def _chunked(items: list[DatasetItem], size: int) -> list[list[DatasetItem]]:
+    chunks: list[list[DatasetItem]] = []
+    iterator = iter(items)
+    while chunk := list(islice(iterator, size)):
+        chunks.append(chunk)
+    return chunks
+
+
 def _clear_demo_data() -> None:
+    ProductImage.objects.filter(product__category__name__startswith=f"{DEMO_PREFIX} ").delete()
+    Product.objects.filter(category__name__startswith=f"{DEMO_PREFIX} ").delete()
     Category.objects.filter(name__startswith=f"{DEMO_PREFIX} ").delete()
 
 
@@ -84,10 +102,10 @@ class Command(BaseCommand):
             help="KaggleHub dataset id to download.",
         )
         parser.add_argument(
-            "--products",
+            "--images-per-product",
             type=int,
-            default=DEFAULT_PRODUCT_TARGET,
-            help="Number of products to seed.",
+            default=DEFAULT_IMAGES_PER_PRODUCT,
+            help="Target number of images per seeded product.",
         )
         parser.add_argument(
             "--shuffle",
@@ -98,12 +116,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         call_command("migrate", interactive=False, verbosity=0)
 
-        target_products = options["products"]
         dataset_id = options["dataset_id"]
+        images_per_product = options["images_per_product"]
         should_shuffle = options["shuffle"]
 
-        if target_products < 1:
-            raise CommandError("--products must be >= 1")
+        if not MIN_IMAGES_PER_PRODUCT <= images_per_product <= MAX_IMAGES_PER_PRODUCT:
+            raise CommandError(
+                f"--images-per-product must be between {MIN_IMAGES_PER_PRODUCT} and {MAX_IMAGES_PER_PRODUCT}"
+            )
 
         self.stdout.write(f"Downloading Kaggle dataset: {dataset_id}")
         dataset_root = _download_dataset(dataset_id)
@@ -123,41 +143,42 @@ class Command(BaseCommand):
         created_images = 0
         unindexed_images = 0
 
+        grouped_items: dict[str, list[DatasetItem]] = {}
         for item in items:
-            if created_products >= target_products:
-                break
+            grouped_items.setdefault(item.category, []).append(item)
 
-            category_name = f"{DEMO_PREFIX} {item.category}"
+        for category_label, category_items in grouped_items.items():
+            category_name = f"{DEMO_PREFIX} {category_label}"
             category = categories.get(category_name)
             if category is None:
                 category = Category.objects.create(name=category_name)
                 categories[category_name] = category
 
-            product_name = f"{item.category} #{created_products + 1}"
-            product = Product.objects.create(
-                name=product_name,
-                description=f"Car listing generated from the Kaggle Stanford car dataset class {item.category}.",
-                price=Decimal("24999.00") + Decimal(created_products * 250),
-                category=category,
-            )
+            for chunk_index, chunk in enumerate(_chunked(category_items, images_per_product), start=1):
+                product = Product.objects.create(
+                    name=f"{category_label} #{chunk_index}",
+                    description=(
+                        f"Car listing generated from the Kaggle Stanford car dataset class {category_label}."
+                    ),
+                    price=Decimal("24999.00") + Decimal(created_products * 250),
+                    category=category,
+                )
 
-            image = ProductImage.objects.create(
-                product=product,
-                image=_to_uploaded_file(item.image_path, name=f"{item.category}_{created_products + 1}"),
-                is_primary=True,
-            )
-            image.refresh_from_db()
+                for image_idx, item in enumerate(chunk, start=1):
+                    image = ProductImage.objects.create(
+                        product=product,
+                        image=_to_uploaded_file(
+                            item.image_path,
+                            name=f"{category_label}_{chunk_index}_{image_idx}",
+                        ),
+                        is_primary=image_idx == 1,
+                    )
+                    image.refresh_from_db()
+                    if not image.indexed or not image.qdrant_id:
+                        unindexed_images += 1
+                    created_images += 1
 
-            if not image.indexed or not image.qdrant_id:
-                unindexed_images += 1
-
-            created_products += 1
-            created_images += 1
-
-        if created_products < target_products:
-            raise CommandError(
-                f"seeded only {created_products} products from {dataset_root}; target was {target_products}"
-            )
+                created_products += 1
 
         self.stdout.write(
             self.style.SUCCESS(

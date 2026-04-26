@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.core.management import BaseCommand, CommandError
+from django.core.management import BaseCommand
 
 from apps.products.models import ProductImage
 from apps.products.services.search_proxy import SearchServiceError, index_product_image
@@ -35,7 +35,7 @@ class Command(BaseCommand):
                         image_bytes=image_file.read(),
                         content_type=getattr(image.image.file, "content_type", "application/octet-stream"),
                     )
-            except SearchServiceError as exc:
+            except (SearchServiceError, FileNotFoundError, OSError) as exc:
                 skipped += 1
                 self.stderr.write(
                     self.style.WARNING(f"Skipped product image {image.pk}: {exc}")

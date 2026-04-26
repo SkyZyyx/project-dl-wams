@@ -1,6 +1,6 @@
 {% extends "users/base.html" %}
 
-{% block title %}WAMS | Profile{% endblock %}
+{% block title %}Apex Motors | Profile{% endblock %}
 
 {% block content %}
 <section class="auth-grid">
@@ -40,14 +40,43 @@
 <script>
     (function () {
         window.__wamsInit(function (ui) {
-            var tokenKey = "auth_access_token";
             var statusEl = document.getElementById("profile-status");
             var metaEl = document.getElementById("profile-meta");
+            var getToken = typeof ui.getAuthToken === "function"
+                ? ui.getAuthToken
+                : function () { return localStorage.getItem("auth_access_token") || ""; };
+            var normalizeRole = typeof ui.normalizeRole === "function"
+                ? ui.normalizeRole
+                : function (role) {
+                    var value = String(role || "").trim().toLowerCase();
+                    return (value === "admin" || value === "seller" || value === "client") ? value : "";
+                };
+            var isInvalidToken = typeof ui.isInvalidTokenMessage === "function"
+                ? ui.isInvalidTokenMessage
+                : function (message) {
+                    var value = String(message || "").toLowerCase();
+                    return value.indexOf("unauthorized") >= 0 || value.indexOf("token not valid") >= 0;
+                };
+            var setSession = typeof ui.setAuthSession === "function"
+                ? ui.setAuthSession
+                : function (token, role) {
+                    localStorage.setItem("auth_access_token", String(token || ""));
+                    if (role) {
+                        localStorage.setItem("auth_user_role", role);
+                    }
+                };
+            var clearSession = typeof ui.clearAuthSession === "function"
+                ? ui.clearAuthSession
+                : function () {
+                    localStorage.removeItem("auth_access_token");
+                    localStorage.removeItem("auth_user_role");
+                };
 
             function renderMeta(data) {
                 metaEl.innerHTML = [
                     ["User ID", data.id],
                     ["Username", data.username],
+                    ["Role", data.role || "Unknown"],
                     ["Email", data.email || "Not set"],
                     ["Name", [data.first_name, data.last_name].filter(Boolean).join(" ") || "Not set"]
                 ].map(function (pair) {
@@ -56,7 +85,7 @@
             }
 
             async function loadProfile() {
-                var token = localStorage.getItem(tokenKey);
+                var token = getToken();
                 if (!token) {
                     ui.setStatus(statusEl, "error", "Unauthorized", "No local access token found.");
                     return;
@@ -78,21 +107,27 @@
                         throw new Error(data.detail || JSON.stringify(data));
                     }
 
+                    setSession(token, normalizeRole(data.role));
                     renderMeta(data);
                     ui.setStatus(statusEl, "success", "Profile loaded", "The auth endpoint returned the current user object.");
                 } catch (error) {
+                    if (isInvalidToken(error.message)) {
+                        clearSession();
+                        ui.setStatus(statusEl, "error", "Session expired", "Please log in again.");
+                        return;
+                    }
                     ui.setStatus(statusEl, "error", "Profile request failed", error.message);
                 }
             }
 
             document.getElementById("load-profile").addEventListener("click", loadProfile);
             document.getElementById("logout").addEventListener("click", function () {
-                localStorage.removeItem(tokenKey);
+                clearSession();
                 ui.setStatus(statusEl, "success", "Logged out locally", "The token was removed from localStorage.");
                 metaEl.innerHTML = [
                     ["Token state", "Cleared"],
                     ["Endpoint", "/api/auth/profile/"],
-                    ["Storage key", tokenKey]
+                    ["Storage key", ui.authTokenKey]
                 ].map(function (pair) {
                     return "<li><span>" + pair[0] + "</span><strong>" + pair[1] + "</strong></li>";
                 }).join("");

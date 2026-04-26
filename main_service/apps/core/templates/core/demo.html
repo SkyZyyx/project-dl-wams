@@ -24,8 +24,8 @@
     </aside>
 </section>
 
-<section class="lab-grid">
-    <div class="panel">
+<section class="lab-stack">
+    <div class="panel lab-workbench">
         <div class="panel-head">
             <div>
                 <p class="card-label">Inputs</p>
@@ -37,7 +37,7 @@
         <label class="dropzone" id="lab-dropzone">
             <input id="lab-image" type="file" accept="image/*">
             <p class="dropzone-title">Drop a reference image.</p>
-            <p class="dropzone-copy">The browser sends the file as multipart form data to <code>/api/search/</code> and then to <code>/api/gradcam/</code>.</p>
+            <p class="dropzone-copy">The browser sends the file as multipart form data to <code>/api/search/</code>.</p>
         </label>
 
         <div class="slider-row">
@@ -49,7 +49,7 @@
         </div>
 
         <div class="form-actions">
-            <button class="button" id="lab-run" type="button">Run search + Grad-CAM</button>
+            <button class="button" id="lab-run" type="button">Run search</button>
             <button class="ghost-button" id="lab-reset" type="button">Reset</button>
         </div>
 
@@ -58,38 +58,16 @@
         <div class="section-head" style="margin-top: 4px;">
             <div>
                 <p class="section-label">Matches</p>
-                <h2>Hydrated product results.</h2>
+                <h2>Hydrated product results with confidence.</h2>
             </div>
             <span class="pill" id="lab-result-count">0 results</span>
         </div>
         <div class="product-grid" id="lab-results"></div>
-    </div>
 
-    <div class="panel lab-preview">
-        <div class="panel-head">
-            <div>
-                <p class="card-label">Grad-CAM</p>
-                <h3>Attention inspection.</h3>
-            </div>
-            <span class="pill">Overlay response</span>
-        </div>
-
-        <div class="lab-figure">
-            <img id="lab-overlay-image" alt="Grad-CAM overlay" hidden>
-            <div class="empty-state" id="lab-overlay-placeholder">Run the lab to reveal the heatmap overlay.</div>
-        </div>
-
-        <div class="notice" id="lab-overlay-copy" data-tone="info">No overlay requested yet.</div>
-
-        <div>
-            <p class="section-label">Search payload</p>
+        <details class="payload-drawer" style="margin-top: 1rem;">
+            <summary>Search payload</summary>
             <pre class="lab-json" id="lab-search-json">{}</pre>
-        </div>
-
-        <div>
-            <p class="section-label">Grad-CAM payload</p>
-            <pre class="lab-json" id="lab-overlay-json">{}</pre>
-        </div>
+        </details>
     </div>
 </section>
 {% endblock %}
@@ -105,15 +83,10 @@
             var runButton = document.getElementById("lab-run");
             var resetButton = document.getElementById("lab-reset");
             var status = document.getElementById("lab-status");
-            var overlayStatus = document.getElementById("lab-overlay-status");
-            var overlayCopy = document.getElementById("lab-overlay-copy");
-            var overlayImage = document.getElementById("lab-overlay-image");
-            var overlayPlaceholder = document.getElementById("lab-overlay-placeholder");
             var results = document.getElementById("lab-results");
             var resultCount = document.getElementById("lab-result-count");
             var filePill = document.getElementById("lab-file-pill");
             var searchJson = document.getElementById("lab-search-json");
-            var overlayJson = document.getElementById("lab-overlay-json");
 
             var currentFile = null;
 
@@ -125,11 +98,6 @@
 
             function setSearchState(tone, title, detail) {
                 ui.setStatus(status, tone, title, detail);
-            }
-
-            function setOverlayState(tone, title, detail) {
-                ui.setStatus(overlayStatus, tone, title, detail);
-                ui.setStatus(overlayCopy, tone, title, detail);
             }
 
             function renderResults(items) {
@@ -177,12 +145,7 @@
                 setFile(null);
                 renderResults([]);
                 searchJson.textContent = "{}";
-                overlayJson.textContent = "{}";
-                overlayImage.hidden = true;
-                overlayImage.removeAttribute("src");
-                overlayPlaceholder.hidden = false;
                 setSearchState("info", "Reset complete", "Choose another image to relaunch the lab.");
-                setOverlayState("info", "Overlay pending", "Grad-CAM is waiting for a new image.");
                 resultCount.textContent = "0 results";
             });
 
@@ -195,7 +158,6 @@
                 runButton.disabled = true;
                 runButton.textContent = "Running";
                 setSearchState("info", "Running search", "Posting the image as multipart form data to main_service.");
-                setOverlayState("info", "Overlay pending", "Grad-CAM will run after the search completes.");
 
                 try {
                     var searchPayload = await ui.searchWithImage(currentFile, threshold.value);
@@ -210,28 +172,14 @@
                         setSearchState("info", "No matches", searchPayload.detail || "Lower the threshold or try another image.");
                     }
 
-                    var overlayPayload = await ui.gradcamWithImage(currentFile);
-                    overlayJson.textContent = JSON.stringify(overlayPayload, null, 2);
-                    overlayImage.hidden = true;
-                    overlayPlaceholder.hidden = false;
-
-                    if (overlayPayload.overlay_b64) {
-                        overlayImage.src = "data:image/png;base64," + overlayPayload.overlay_b64;
-                        overlayImage.hidden = false;
-                        overlayPlaceholder.hidden = true;
-                    }
-
-                    setOverlayState("success", "Overlay ready", overlayPayload.width && overlayPayload.height ? overlayPayload.width + "x" + overlayPayload.height + " heatmap returned." : "Grad-CAM payload loaded.");
                 } catch (error) {
                     searchJson.textContent = JSON.stringify({ error: error.message }, null, 2);
-                    overlayJson.textContent = JSON.stringify({ error: error.message }, null, 2);
                     renderResults([]);
                     resultCount.textContent = "0 results";
                     setSearchState("error", "Lab failed", error.message);
-                    setOverlayState("error", "Overlay failed", error.message);
                 } finally {
                     runButton.disabled = false;
-                    runButton.textContent = "Run search + Grad-CAM";
+                    runButton.textContent = "Run search";
                 }
             });
 

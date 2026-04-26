@@ -1,5 +1,6 @@
 from uuid import uuid4
 
+from django.conf import settings
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -7,10 +8,10 @@ from rest_framework.views import APIView
 
 from .serializers import IndexRequestSerializer, SearchMatchSerializer, SearchRequestSerializer
 from .services.embedder import get_embedder
+from .services.model_registry import get_default_model_id, get_model_spec
 from .services.preprocess import preprocess_image_bytes
 from .services.qdrant import (
     delete_by_product_id,
-    is_query_vector_out_of_distribution,
     is_top_hit_below_ood_threshold,
     search_vectors,
     upsert_vector,
@@ -23,6 +24,12 @@ class IndexView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
+        spec = get_model_spec(get_default_model_id())
+        print(
+            f"[MODEL_TRACE] index model={spec.model_id} "
+            f"collection={spec.collection_name} "
+            f"checkpoint={spec.checkpoint_path or '<none>'}"
+        )
         serializer = IndexRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -61,6 +68,12 @@ class SearchView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
+        spec = get_model_spec(get_default_model_id())
+        print(
+            f"[MODEL_TRACE] search model={spec.model_id} "
+            f"collection={spec.collection_name} "
+            f"checkpoint={spec.checkpoint_path or '<none>'}"
+        )
         serializer = SearchRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -72,8 +85,6 @@ class SearchView(APIView):
 
         embedding_bytes = preprocess_image_bytes(image_bytes)
         vector = get_embedder().embed(embedding_bytes)
-        if is_query_vector_out_of_distribution(vector=vector):
-            return Response({"detail": "no similar products found", "matches": []}, status=status.HTTP_200_OK)
 
         results = search_vectors(
             vector=vector,
@@ -84,6 +95,10 @@ class SearchView(APIView):
         # Keep a conservative floor for weak nearest-neighbor hits.
         if is_top_hit_below_ood_threshold(results=results):
             return Response({"detail": "no similar products found", "matches": []}, status=status.HTTP_200_OK)
+
+        # Filter out individual results below the minimum score floor.
+        min_score = getattr(settings, "SEARCH_MIN_SCORE_THRESHOLD", 0.80)
+        results = [r for r in results if float(getattr(r, "score", 0)) >= min_score]
 
         matches = []
         for result in results:

@@ -5,28 +5,33 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#050505">
-    <meta name="description" content="A minimalist image-search storefront powered by main_service.">
-    <title>{% block title %}WAMS{% endblock %}</title>
+    <meta name="description" content="Apex Motors high-performance car marketplace powered by main_service.">
+    <title>{% block title %}Apex Motors{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'users/site.css' %}">
     {% block head_extra %}{% endblock %}
 </head>
 <body>
     <div class="page-shell">
         <header class="site-topbar">
-            <a class="brand" href="/" aria-label="WAMS home">
+            <a class="brand" href="/" aria-label="Apex Motors home">
                 <span class="brand-mark"></span>
                 <span class="brand-copy">
-                    <strong>WAMS</strong>
-                    <span>visual commerce</span>
+                    <strong>Apex Motors</strong>
+                    <span>drive the elite</span>
                 </span>
             </a>
             <nav class="site-nav" aria-label="Main">
-                <a href="/">Shop</a>
-                <a href="/demo/">Lab</a>
-                <a href="/auth/login/">Login</a>
-                <a href="/auth/register/">Register</a>
-                <a href="/auth/profile/">Profile</a>
+                <a href="/">Inventory</a>
+                <a href="/demo/">Studio</a>
+                <a id="nav-login" href="/auth/login/">Login</a>
+                <a id="nav-register" href="/auth/register/">Register</a>
+                <a id="nav-profile" href="/auth/profile/">Profile</a>
+                <a id="nav-sell" href="/auth/seller/">Sell</a>
             </nav>
+            <div class="role-chip" id="role-badge" hidden aria-live="polite">
+                <span>Role</span>
+                <strong id="role-badge-value">Client</strong>
+            </div>
         </header>
 
         <main class="site-main">

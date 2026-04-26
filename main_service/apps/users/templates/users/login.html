@@ -1,6 +1,6 @@
 {% extends "users/base.html" %}
 
-{% block title %}WAMS | Login{% endblock %}
+{% block title %}Apex Motors | Login{% endblock %}
 
 {% block content %}
 <section class="auth-grid">
@@ -45,9 +45,35 @@
 <script>
     (function () {
         window.__wamsInit(function (ui) {
-            var tokenKey = "auth_access_token";
             var form = document.getElementById("login-form");
             var status = document.getElementById("login-status");
+            var normalizeRole = typeof ui.normalizeRole === "function"
+                ? ui.normalizeRole
+                : function (role) {
+                    var value = String(role || "").trim().toLowerCase();
+                    return (value === "admin" || value === "seller" || value === "client") ? value : "";
+                };
+            var setSession = typeof ui.setAuthSession === "function"
+                ? ui.setAuthSession
+                : function (token, role) {
+                    localStorage.setItem("auth_access_token", String(token || ""));
+                    if (role) {
+                        localStorage.setItem("auth_user_role", role);
+                    }
+                };
+            var loadProfile = typeof ui.fetchAuthProfile === "function"
+                ? ui.fetchAuthProfile
+                : async function (token) {
+                    var response = await fetch("/api/auth/profile/", {
+                        method: "GET",
+                        headers: { Authorization: "Bearer " + token, Accept: "application/json" }
+                    });
+                    var payload = await response.json();
+                    if (!response.ok) {
+                        throw new Error(payload.detail || JSON.stringify(payload));
+                    }
+                    return payload;
+                };
 
             form.addEventListener("submit", async function (event) {
                 event.preventDefault();
@@ -69,8 +95,25 @@
                         throw new Error(data.detail || JSON.stringify(data));
                     }
 
-                    localStorage.setItem(tokenKey, data.access || "");
-                    ui.setStatus(status, "success", "Login successful", "Access token stored locally. Open profile to verify it.");
+                    var accessToken = String(data.access || "").trim();
+                    if (!accessToken) {
+                        throw new Error("Login response did not include an access token.");
+                    }
+
+                    var role = normalizeRole(data.role || (data.user && data.user.role));
+                    if (!role) {
+                        var profile = await loadProfile(accessToken);
+                        role = normalizeRole(profile.role);
+                    }
+
+                    setSession(accessToken, role);
+                    if (typeof ui.updateNavLinks === "function") {
+                        ui.updateNavLinks();
+                    }
+                    if (typeof ui.updateRoleBadge === "function") {
+                        ui.updateRoleBadge();
+                    }
+                    ui.setStatus(status, "success", "Login successful", "Session stored. Current role: " + (role || "unknown") + ".");
                 } catch (error) {
                     ui.setStatus(status, "error", "Login failed", error.message);
                 }

@@ -26,7 +26,11 @@ class ModelSpec:
 
 
 def _build_registry() -> dict[str, ModelSpec]:
-    dinov2_pretrained_source = getattr(settings, "DINOv2_PRETRAINED_SOURCE", "facebook/dinov2-base")
+    dinov2_pretrained_source = getattr(
+        settings,
+        "DINOV2_PRETRAINED_SOURCE",
+        getattr(settings, "DINOv2_PRETRAINED_SOURCE", "facebook/dinov2-base"),
+    )
     return {
         "clip_vit_b32_pretrained": ModelSpec(
             model_id="clip_vit_b32_pretrained",
@@ -52,8 +56,9 @@ def _build_registry() -> dict[str, ModelSpec]:
             model_id="dinov2_base_transfer",
             label="DINOv2-base + transfer learning",
             family="dinov2",
-            source=getattr(settings, "DINOv2_TRANSFER_SOURCE", dinov2_pretrained_source),
-            checkpoint_path=_optional_path_setting("DINOv2_TRANSFER_CHECKPOINT_PATH"),
+            source=getattr(settings, "DINOV2_TRANSFER_SOURCE", getattr(settings, "DINOv2_TRANSFER_SOURCE", dinov2_pretrained_source)),
+            checkpoint_path=_optional_path_setting("DINOV2_TRANSFER_CHECKPOINT_PATH")
+            or _optional_path_setting("DINOv2_TRANSFER_CHECKPOINT_PATH"),
             vector_size=768,
             collection_name="product_images_dinov2_base_transfer",
             gradcam_supported=True,
@@ -62,10 +67,29 @@ def _build_registry() -> dict[str, ModelSpec]:
             model_id="dinov2_base_finetuned",
             label="DINOv2-base fine-tuned",
             family="dinov2",
-            source=getattr(settings, "DINOv2_FINETUNED_SOURCE", dinov2_pretrained_source),
-            checkpoint_path=_optional_path_setting("DINOv2_FINETUNED_CHECKPOINT_PATH"),
+            source=getattr(settings, "DINOV2_FINETUNED_SOURCE", getattr(settings, "DINOv2_FINETUNED_SOURCE", dinov2_pretrained_source)),
+            checkpoint_path=_optional_path_setting("DINOV2_FINETUNED_CHECKPOINT_PATH")
+            or _optional_path_setting("DINOv2_FINETUNED_CHECKPOINT_PATH"),
             vector_size=768,
             collection_name="product_images_dinov2_base_finetuned",
+            gradcam_supported=True,
+        ),
+        "dinov2_base_triplet_finetuned": ModelSpec(
+            model_id="dinov2_base_triplet_finetuned",
+            label="DINOv2-base triplet fine-tuned",
+            family="dinov2",
+            source=getattr(
+                settings,
+                "DINOV2_TRIPLET_FINETUNED_SOURCE",
+                getattr(settings, "DINOv2_TRIPLET_FINETUNED_SOURCE", "vit_base_patch14_dinov2.lvd142m"),
+            ),
+            checkpoint_path=_optional_path_setting("DINOV2_TRIPLET_FINETUNED_CHECKPOINT_PATH")
+            or _optional_path_setting("DINOv2_TRIPLET_FINETUNED_CHECKPOINT_PATH"),
+            vector_size=max(
+                1,
+                int(getattr(settings, "DINOV2_TRIPLET_FINETUNED_VECTOR_SIZE", getattr(settings, "DINOv2_TRIPLET_FINETUNED_VECTOR_SIZE", 512))),
+            ),
+            collection_name="product_images_dinov2_base_triplet_finetuned",
             gradcam_supported=True,
         ),
     }
