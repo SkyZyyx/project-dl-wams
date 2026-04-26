@@ -57,11 +57,9 @@ def _download_dataset(dataset_id: str) -> Path:
 
 def _iter_dataset_items(dataset_root: Path) -> list[DatasetItem]:
     items: list[DatasetItem] = []
-    for category_dir in sorted(p for p in dataset_root.iterdir() if p.is_dir()):
-        category = _slugish_name(category_dir.name)
-        for image_path in sorted(category_dir.rglob("*")):
-            if image_path.suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
-                continue
+    for image_path in sorted(dataset_root.rglob("*")):
+        if image_path.is_file() and image_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+            category = _slugish_name(image_path.parent.name)
             items.append(DatasetItem(category=category, image_path=image_path))
     return items
 
