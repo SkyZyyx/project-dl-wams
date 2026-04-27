@@ -9,3 +9,8 @@
 **/*.sqlite3
 
 .DS_Store
+
+retrieval_model.pth
+faiss_index.bin
+gallery_metadata.pkl
+models/
