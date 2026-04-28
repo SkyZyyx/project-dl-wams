@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import random
 import re
-from itertools import islice
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import BaseCommand, CommandError, call_command
@@ -18,7 +17,7 @@ DEMO_PREFIX = "Kaggle Cars"
 DEFAULT_DATASET_ID = "jutrera/stanford-car-dataset-by-classes-folder"
 DEFAULT_IMAGES_PER_PRODUCT = 5
 MIN_IMAGES_PER_PRODUCT = 5
-MAX_IMAGES_PER_PRODUCT = 10
+MAX_IMAGES_PER_PRODUCT = 15
 
 
 @dataclass(frozen=True)
@@ -64,12 +63,10 @@ def _iter_dataset_items(dataset_root: Path) -> list[DatasetItem]:
     return items
 
 
-def _chunked(items: list[DatasetItem], size: int) -> list[list[DatasetItem]]:
-    chunks: list[list[DatasetItem]] = []
-    iterator = iter(items)
-    while chunk := list(islice(iterator, size)):
-        chunks.append(chunk)
-    return chunks
+def _select_product_images(items: list[DatasetItem], limit: int) -> list[DatasetItem]:
+    if len(items) <= limit:
+        return list(items)
+    return list(items[:limit])
 
 
 def _clear_demo_data() -> None:
@@ -152,31 +149,34 @@ class Command(BaseCommand):
                 category = Category.objects.create(name=category_name)
                 categories[category_name] = category
 
-            for chunk_index, chunk in enumerate(_chunked(category_items, images_per_product), start=1):
-                product = Product.objects.create(
-                    name=f"{category_label} #{chunk_index}",
-                    description=(
-                        f"Car listing generated from the Kaggle Stanford car dataset class {category_label}."
+            selected_items = _select_product_images(category_items, images_per_product)
+            if len(selected_items) < MIN_IMAGES_PER_PRODUCT:
+                continue
+
+            product = Product.objects.create(
+                name=category_label,
+                description=(
+                    f"Car listing generated from the Kaggle Stanford car dataset class {category_label}."
+                ),
+                price=Decimal("24999.00") + Decimal(created_products * 250),
+                category=category,
+            )
+
+            for image_idx, item in enumerate(selected_items, start=1):
+                image = ProductImage.objects.create(
+                    product=product,
+                    image=_to_uploaded_file(
+                        item.image_path,
+                        name=f"{category_label}_{image_idx}",
                     ),
-                    price=Decimal("24999.00") + Decimal(created_products * 250),
-                    category=category,
+                    is_primary=image_idx == 1,
                 )
+                image.refresh_from_db()
+                if not image.indexed or not image.qdrant_id:
+                    unindexed_images += 1
+                created_images += 1
 
-                for image_idx, item in enumerate(chunk, start=1):
-                    image = ProductImage.objects.create(
-                        product=product,
-                        image=_to_uploaded_file(
-                            item.image_path,
-                            name=f"{category_label}_{chunk_index}_{image_idx}",
-                        ),
-                        is_primary=image_idx == 1,
-                    )
-                    image.refresh_from_db()
-                    if not image.indexed or not image.qdrant_id:
-                        unindexed_images += 1
-                    created_images += 1
-
-                created_products += 1
+            created_products += 1
 
         self.stdout.write(
             self.style.SUCCESS(
