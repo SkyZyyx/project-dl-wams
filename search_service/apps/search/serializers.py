@@ -9,7 +9,7 @@ class IndexRequestSerializer(serializers.Serializer):
 
 class SearchRequestSerializer(serializers.Serializer):
     image = serializers.ImageField(required=True)
-    limit = serializers.IntegerField(required=False, min_value=1, max_value=20, default=5)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=10, default=10)
     score_threshold = serializers.FloatField(required=False, allow_null=True)
 
 

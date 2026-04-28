@@ -122,6 +122,7 @@
 
             document.getElementById("load-profile").addEventListener("click", loadProfile);
             document.getElementById("logout").addEventListener("click", function () {
+            
                 clearSession();
                 ui.setStatus(statusEl, "success", "Logged out locally", "The token was removed from localStorage.");
                 metaEl.innerHTML = [
@@ -131,6 +132,9 @@
                 ].map(function (pair) {
                     return "<li><span>" + pair[0] + "</span><strong>" + pair[1] + "</strong></li>";
                 }).join("");
+                setTimeout(function () {
+    window.location.href = "/auth/login/";
+}, 300);
             });
 
             loadProfile();

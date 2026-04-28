@@ -7,7 +7,18 @@ from django.test import RequestFactory, TestCase
 from rest_framework.test import APIRequestFactory
 
 from apps.core.views import DemoPageView
-from apps.users.views import LandingPageView, LoginPageView, ProfilePageView, RegisterPageView
+from apps.users.views import (
+    AccessDeniedPageView,
+    CarDetailPageView,
+    LandingPageView,
+    LoginPageView,
+    ProfilePageView,
+    RegisterPageView,
+    bad_request_page,
+    page_not_found,
+    permission_denied_page,
+    server_error_page,
+)
 from .permissions import SellerWritePermission
 from .views import SearchView
 
@@ -60,6 +71,7 @@ class SearchProxyTests(TestCase):
         self.assertEqual(mock_proxy_search_image.call_args.kwargs["content_type"], "image/png")
         self.assertTrue(mock_proxy_search_image.call_args.kwargs["image_bytes"])
         self.assertEqual(mock_proxy_search_image.call_args.kwargs["score_threshold"], 0.65)
+        self.assertEqual(mock_proxy_search_image.call_args.kwargs["limit"], 10)
 
     @patch("apps.core.views.proxy_search_image_with_threshold")
     def test_search_proxy_passes_through_ood_detail(self, mock_proxy_search_image):
@@ -85,14 +97,25 @@ class PageRenderTests(TestCase):
     def test_home_page_renders_storefront(self):
         content = self.render_view(LandingPageView.as_view())
 
-        self.assertIn("Cars for sale, auction energy.", content)
-        self.assertIn("auction-card", content)
+        self.assertIn("Find the right car fast, then dive into a focused detail page.", content)
+        self.assertIn("inventory-search", content)
         self.assertIn("__wamsInit", content)
+
+    def test_car_detail_page_renders(self):
+        response = CarDetailPageView.as_view()(self.factory.get("/cars/9/"), pk=9)
+        response.render()
+        content = response.content.decode("utf-8")
+
+        self.assertIn("Dedicated detail page", content)
+        self.assertIn("Five recommended alternatives from visual retrieval.", content)
+        self.assertIn("data-car-id=\"9\"", content)
 
     def test_demo_page_renders_lab(self):
         content = self.render_view(DemoPageView.as_view(), path="/demo/")
 
         self.assertIn("Search flow, fully exposed.", content)
+        self.assertIn("Top 10 hydrated product results ranked high to low.", content)
+        self.assertIn("Click a result to find similar products.", content)
         self.assertNotIn("/api/gradcam/", content)
         self.assertNotIn("lab-overlay-preview", content)
         self.assertNotIn("gradcamWithImage", content)
@@ -108,6 +131,31 @@ class PageRenderTests(TestCase):
             response.render()
             content = response.content.decode("utf-8")
             self.assertIn(marker, content)
+
+    def test_access_denied_page_renders(self):
+        response = AccessDeniedPageView.as_view()(self.factory.get("/auth/access-denied/?next=/auth/seller/"))
+        response.render()
+        content = response.content.decode("utf-8")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("You do not have permission to open seller tools.", content)
+        self.assertIn("/auth/login/", content)
+        self.assertIn("/auth/seller/", content)
+
+    def test_error_handlers_render_minimal_pages(self):
+        for view, code, marker in [
+            (bad_request_page, 400, "That request could not be processed."),
+            (permission_denied_page, 403, "You do not have permission to open this area."),
+            (page_not_found, 404, "Nothing is parked here."),
+            (server_error_page, 500, "Something broke on our side."),
+        ]:
+            response = view(self.factory.get("/missing/"))
+            response.render()
+            content = response.content.decode("utf-8")
+
+            self.assertEqual(response.status_code, code)
+            self.assertIn(marker, content)
+            self.assertIn("Apex Motors", content)
 
 
 class _FakeUser:

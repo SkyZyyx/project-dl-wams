@@ -1,9 +1,9 @@
-(function () {
+(function() {
     var AUTH_TOKEN_KEY = "auth_access_token";
     var AUTH_ROLE_KEY = "auth_user_role";
 
     function escapeHtml(value) {
-        return String(value ?? "").replace(/[&<>\"']/g, function (char) {
+        return String(value ?? "").replace(/[&<>\"']/g, function(char) {
             return ({
                 "&": "&amp;",
                 "<": "&lt;",
@@ -60,6 +60,18 @@
         }
 
         return "";
+    }
+
+    function productImages(product) {
+        return ((product && product.images) || []).map(function(image) {
+            if (image.image_url) {
+                return image.image_url;
+            }
+            if (image.thumbnail_b64) {
+                return "data:image/jpeg;base64," + image.thumbnail_b64;
+            }
+            return "";
+        }).filter(Boolean);
     }
 
     function renderProductCard(product, options) {
@@ -128,6 +140,30 @@
         article.appendChild(title);
         article.appendChild(copy);
         article.appendChild(footer);
+
+        if (typeof config.onSelect === "function") {
+            article.tabIndex = 0;
+            article.style.cursor = "pointer";
+            article.addEventListener("click", function() {
+                config.onSelect(product, article);
+            });
+            article.addEventListener("keydown", function(event) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    config.onSelect(product, article);
+                }
+            });
+        }
+
+        if (config.href) {
+            article.addEventListener("click", function(event) {
+                if (event.target.closest("button, a, input, textarea, select, label")) {
+                    return;
+                }
+                window.location.href = config.href.replace("__ID__", encodeURIComponent(product.id));
+            });
+        }
+
         return article;
     }
 
@@ -144,7 +180,7 @@
             return;
         }
 
-        list.forEach(function (item) {
+        list.forEach(function(item) {
             container.appendChild(renderProductCard(item, config));
         });
     }
@@ -261,7 +297,9 @@
     function updateNavLinks() {
         var loginLink = document.getElementById("nav-login");
         var registerLink = document.getElementById("nav-register");
+        var profileLink = document.getElementById("nav-profile");
         var sellLink = document.getElementById("nav-sell");
+        var logoutLink = document.getElementById("nav-logout");
         var authenticated = hasToken();
         var role = getStoredRole();
 
@@ -271,8 +309,14 @@
         if (registerLink) {
             registerLink.hidden = authenticated;
         }
+        if (profileLink) {
+            profileLink.hidden = !authenticated;
+        }
         if (sellLink) {
             sellLink.hidden = !authenticated || (role !== "seller" && role !== "admin");
+        }
+        if (logoutLink) {
+            logoutLink.hidden = !authenticated;
         }
     }
 
@@ -317,20 +361,10 @@
         return data;
     }
 
-    async function searchWithImage(file, threshold) {
-        var formData = new FormData();
-        formData.append("image", file);
-        formData.append("score_threshold", String(threshold));
-        return fetchJson("/api/search/", {
-            method: "POST",
-            body: formData
-        });
-    }
-
-    async function loadCollection(endpoint) {
-        var response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+    async function fetchCollectionPage(url) {
+        var response = await fetch(url, { headers: { Accept: "application/json" } });
         var text = await response.text();
-        var data = [];
+        var data = {};
 
         if (text) {
             try {
@@ -345,17 +379,93 @@
             throw new Error(detail || ("Request failed (HTTP " + response.status + ")"));
         }
 
-        return Array.isArray(data) ? data : (data.results || []);
+        return data;
+    }
+
+    async function searchWithImage(file, threshold, limit) {
+        var formData = new FormData();
+        formData.append("image", file);
+        formData.append("score_threshold", String(threshold));
+        if (limit !== undefined && limit !== null && limit !== "") {
+            formData.append("limit", String(limit));
+        }
+        return fetchJson("/api/search/", {
+            method: "POST",
+            body: formData
+        });
+    }
+
+    async function loadCollection(endpoint) {
+        var firstPayload = await fetchCollectionPage(endpoint);
+
+        if (Array.isArray(firstPayload)) {
+            return firstPayload;
+        }
+
+        if (!firstPayload || typeof firstPayload !== "object") {
+            return [];
+        }
+
+        if (!Array.isArray(firstPayload.results)) {
+            return [];
+        }
+
+        var items = firstPayload.results.slice();
+        var nextUrl = firstPayload.next;
+        var visited = {};
+
+        while (nextUrl) {
+            if (visited[nextUrl]) {
+                break;
+            }
+            visited[nextUrl] = true;
+
+            var pageUrl = nextUrl;
+            if (pageUrl.indexOf("http://") !== 0 && pageUrl.indexOf("https://") !== 0) {
+                pageUrl = new URL(pageUrl, window.location.href).toString();
+            }
+
+            var pagePayload = await fetchCollectionPage(pageUrl);
+            if (!pagePayload || typeof pagePayload !== "object" || !Array.isArray(pagePayload.results)) {
+                break;
+            }
+
+            items = items.concat(pagePayload.results);
+            nextUrl = pagePayload.next;
+        }
+
+        return items;
+    }
+
+    async function fetchProductById(productId) {
+        var items;
+        if (productId === undefined || productId === null || productId === "") {
+            throw new Error("Product id is required.");
+        }
+        items = await loadCollection("/api/products/?ids=" + encodeURIComponent(String(productId)));
+        return items.length ? items[0] : null;
     }
 
     async function loadHealth() {
         return fetchJson("/api/health/", { headers: { Accept: "application/json" } });
     }
 
-    window.addEventListener("wams:session-changed", function () {
+    window.addEventListener("wams:session-changed", function() {
         updateRoleBadge();
         updateNavLinks();
     });
+
+    document.addEventListener("click", function(event) {
+        var target = event.target && event.target.closest ? event.target.closest("#nav-logout") : null;
+        if (!target) {
+            return;
+        }
+
+        event.preventDefault();
+        clearAuthSession();
+        window.location.href = "/auth/login/";
+    });
+
     updateRoleBadge();
     updateNavLinks();
     hydrateRoleFromProfile();
@@ -368,12 +478,14 @@
         formatScore: formatScore,
         formatSimilarity: formatSimilarity,
         imageSource: imageSource,
+        productImages: productImages,
         renderProductCard: renderProductCard,
         renderProductGrid: renderProductGrid,
         setStatus: setStatus,
         fetchJson: fetchJson,
         searchWithImage: searchWithImage,
         loadCollection: loadCollection,
+        fetchProductById: fetchProductById,
         loadHealth: loadHealth,
         normalizeRole: normalizeRole,
         isInvalidTokenMessage: isInvalidTokenMessage,

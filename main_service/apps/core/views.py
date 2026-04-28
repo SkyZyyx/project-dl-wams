@@ -40,18 +40,24 @@ class SearchView(APIView):
 
         try:
             score_threshold = request.data.get("score_threshold")
+            limit = request.data.get("limit")
             if score_threshold in (None, ""):
                 threshold_value = None
             else:
                 threshold_value = float(score_threshold)
+            if limit in (None, ""):
+                limit_value = 10
+            else:
+                limit_value = max(1, min(int(limit), 10))
             search_payload = proxy_search_image_with_threshold(
                 image_name=image.name,
                 image_bytes=image.read(),
                 content_type=getattr(image, "content_type", "application/octet-stream"),
                 score_threshold=threshold_value,
+                limit=limit_value,
             )
         except ValueError:
-            return Response({"score_threshold": ["Enter a valid number."]}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Enter valid score_threshold and limit values."}, status=status.HTTP_400_BAD_REQUEST)
         except SearchServiceError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -106,8 +112,7 @@ class SearchView(APIView):
             hydrated_matches.append(product_data)
 
         hydrated_matches.sort(key=lambda item: item.get("score", 0), reverse=True)
-        return Response({"matches": hydrated_matches})
-
+        return Response({"matches": hydrated_matches[:10]})
 
 class ProductListView(APIView):
     permission_classes = [SellerWritePermission]

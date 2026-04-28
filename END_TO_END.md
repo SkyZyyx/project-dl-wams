@@ -1,126 +1,177 @@
 # End To End Runbook
 
-This repo now runs as a split stack:
-
-- `main_service` is the gateway/UI
-- `user_service` owns auth and users
-- `product_service` owns catalog data
-- `order_service` owns orders
-- `search_service` owns image search and Grad-CAM
+Use this from a fresh clone. It starts the full Docker stack, seeds demo cars,
+builds the image-search index, then gives commands to verify the app works.
 
 ## 1. Prerequisites
 
 - Docker
 - Docker Compose
+- Kaggle account and API token for the demo dataset
 
-## 2. Start Everything
+Create a Kaggle token from `Kaggle -> Account -> API -> Create New Token`.
+You need `KAGGLE_USERNAME` and `KAGGLE_API_TOKEN`.
+
+## 2. Configure Environment
 
 From the repo root:
 
 ```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your Kaggle values:
+
+```bash
+KAGGLE_USERNAME=your_kaggle_username
+KAGGLE_API_TOKEN=your_kaggle_api_token
+```
+
+For a first run, keep this model setting unless you also have the trained
+checkpoint mounted in `./models`:
+
+```bash
+DEFAULT_SEARCH_MODEL=dinov2_base_pretrained
+```
+
+Do not use `DEFAULT_SEARCH_MODEL=dinov2_base_triplet_finetuned` unless
+`DINOV2_TRIPLET_FINETUNED_CHECKPOINT_PATH` points to a real file in the
+container, for example `/models/retrieval_model.pth`.
+
+## 3. Start The Stack
+
+```bash
 docker compose up -d --build
 ```
 
-Wait for the services to come up. The important ones are:
+Wait until containers are up:
 
-- `main_service` on `http://localhost:8000`
-- `user_service` on `http://localhost:8001`
-- `product_service` on `http://localhost:8002`
-- `order_service` on `http://localhost:8003`
-- `search_service` on `http://localhost:8004`
-- public Nginx entrypoint on `http://localhost:8080`
+```bash
+docker compose ps
+```
 
-## 3. Seed Demo Data
+Expected app ports:
 
-Seed the catalog from the product service:
+- Main gateway/UI: `http://localhost:8080`
+- Main service direct: `http://localhost:8000`
+- User service: `http://localhost:8001`
+- Product service: `http://localhost:8002`
+- Order service: `http://localhost:8003`
+- Search service: `http://localhost:8004`
+- Qdrant: `http://localhost:6333/dashboard`
+
+## 4. Seed Demo Products
 
 ```bash
 docker compose exec product_service python manage.py seed_demo
 ```
 
-This step can take a while the first time because it downloads the demo dataset.
-The seeder now pulls `jutrera/stanford-car-dataset-by-classes-folder` through KaggleHub.
+First run can take a while because it downloads
+`jutrera/stanford-car-dataset-by-classes-folder` through KaggleHub.
 
-### Kaggle Credentials (Required For Seeding)
+## 5. Build Image Search Index
 
-KaggleHub downloads from Kaggle, so the `product_service` container needs Kaggle credentials.
-
-Option A (recommended): export env vars on your machine, then start Docker:
-
-```bash
-export KAGGLE_USERNAME="your_kaggle_username"
-export KAGGLE_API_TOKEN="your_kaggle_api_token"
-docker compose up -d --build
-docker compose exec product_service python manage.py seed_demo
-```
-
-Option B: mount a `kaggle.json` into the container:
-
-1. Create `~/.kaggle/kaggle.json` on your machine (from Kaggle Account -> API -> Create New Token).
-2. Add a volume mapping in `docker-compose.yml` for `product_service`:
-
-```yaml
-volumes:
-  - ~/.kaggle/kaggle.json:/root/.kaggle/kaggle.json:ro
-```
-
-Then run:
+If Qdrant already has old data, reset the active collection first. This avoids
+the bug where search returns old product IDs and the gateway hydrates nothing.
 
 ```bash
-docker compose up -d --build
-docker compose exec product_service python manage.py seed_demo
+docker compose exec search_service python manage.py shell -c "from apps.search.services.model_registry import get_default_model_id, get_model_spec; from apps.search.services.qdrant import get_client, ensure_collection, clear_collection_mean_vector_cache; spec=get_model_spec(get_default_model_id()); client=get_client(); exists=client.collection_exists(spec.collection_name) if hasattr(client, 'collection_exists') else spec.collection_name in {c.name for c in client.get_collections().collections}; client.delete_collection(spec.collection_name) if exists else None; ensure_collection(); clear_collection_mean_vector_cache(); print('reset', spec.collection_name)"
 ```
 
-The seed command now builds one product from each 5-image chunk of the dataset, so each seeded product carries multiple angles instead of a single photo.
+Then rebuild the index from the current product DB:
 
-## 4. Verify The Stack
+```bash
+docker compose exec product_service python manage.py shell -c "from apps.products.models import ProductImage; ProductImage.objects.update(indexed=False, qdrant_id=None); print('marked', ProductImage.objects.count())"
+docker compose exec product_service python manage.py reindex_product_images
+```
 
-Open these URLs:
+The reindex step is slow because every product image is embedded and sent to
+Qdrant. Let it finish.
 
-- Main app: `http://localhost:8080/`
-- Demo page: `http://localhost:8080/demo/`
-- Main health check: `http://localhost:8080/api/health/`
-- User health check: `http://localhost:8001/api/health/`
-- Product health check: `http://localhost:8002/api/health/`
-- Order health check: `http://localhost:8003/api/health/`
-- Search health check: `http://localhost:8004/api/health/`
+## 6. Health Checks
 
-## 5. Smoke Test
+```bash
+curl -s http://localhost:8080/api/health/
+curl -s http://localhost:8001/api/health/
+curl -s http://localhost:8002/api/health/
+curl -s http://localhost:8003/api/health/
+curl -s http://localhost:8004/api/health/
+```
 
-Run the gateway smoke command:
+Each should return JSON with `"status":"ok"`.
+
+## 7. Test Image Search
+
+Open UI:
+
+```text
+http://localhost:8080/
+```
+
+Upload a car image in the visual search form.
+
+If this repo includes `bmw.jpeg` and `audi.jpg` in the project root, test the
+API directly:
+
+```bash
+curl -s -F image=@bmw.jpeg http://localhost:8080/api/search/
+curl -s -F image=@audi.jpg http://localhost:8080/api/search/
+```
+
+Expected: response contains `"matches"` with product objects, not an empty list.
+
+You can compare the raw search service against the gateway:
+
+```bash
+curl -s -F image=@bmw.jpeg http://localhost:8004/api/search/
+curl -s -F image=@bmw.jpeg http://localhost:8000/api/search/
+```
+
+Search service returns raw IDs/scores. Gateway returns hydrated products.
+
+## 8. Test Recommendations
+
+Open any car detail page from the UI, or use one product ID returned by search:
+
+```text
+http://localhost:8080/cars/<product_id>/
+```
+
+Recommendations should load below the car details. If they do not, check that
+the image index was rebuilt after seeding.
+
+## 9. Automated Smoke Tests
 
 ```bash
 docker compose exec main_service python manage.py demo_smoke
-```
-
-Run the search-service tests:
-
-```bash
 docker compose exec search_service python manage.py test apps.search.tests
-```
-
-Run the gateway tests:
-
-```bash
 docker compose exec main_service python manage.py test apps.core.tests
 ```
 
-## 6. Optional Colab Model Import
-
-If you trained a model in Colab, mount it into `./models` and set one of these env vars before starting Docker:
-
-- `DINOv2_FINETUNED_SOURCE` for a Hugging Face-style folder created with `save_pretrained(...)`
-- `DINOv2_FINETUNED_CHECKPOINT_PATH` for a `.pt` or `.pth` file
-- `DINOv2_TRANSFER_CHECKPOINT_PATH` for the transfer-learning checkpoint
-- `CLIP_VIT_B32_CHECKPOINT_PATH` for a CLIP checkpoint
-
-Example:
+## 10. Useful Logs
 
 ```bash
-export DINOv2_FINETUNED_CHECKPOINT_PATH=/models/my_colab_model.pt
-docker compose up -d --build
+docker compose logs --tail=100 main_service
+docker compose logs --tail=100 product_service
+docker compose logs --tail=100 search_service
+docker compose logs --tail=100 qdrant
 ```
 
-## 7. What Was Removed
+If image search returns no UI results but raw search returns IDs, the usual
+cause is stale Qdrant vectors. Run section 5 again.
 
-The old monolith-only catalog and order apps inside `main_service` were removed. The gateway now talks to the dedicated services over HTTP, which is what you want for a true microservice split.
+## 11. Stop Or Reset
+
+Stop containers, keep data:
+
+```bash
+docker compose down
+```
+
+Full reset, delete DBs and Qdrant data:
+
+```bash
+docker compose down -v
+```
+
+After a full reset, run sections 3 through 7 again.

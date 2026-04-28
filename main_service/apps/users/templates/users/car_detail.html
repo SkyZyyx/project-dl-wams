@@ -1,0 +1,220 @@
+{% extends "users/base.html" %}
+
+{% block title %}Apex Motors | Car detail{% endblock %}
+
+{% block content %}
+<section class="detail-shell" data-car-id="{{ car_id }}">
+    <header class="detail-hero">
+        <div>
+            <p class="eyebrow">Dedicated detail page</p>
+            <h1 id="car-detail-title">Loading car</h1>
+            <p class="lede" id="car-detail-copy">Fetching images, specs, and the recommendation set for this listing.</p>
+        </div>
+        <div class="detail-hero-actions">
+            <a class="button" href="#car-detail-buy-form">Buy now</a>
+            <a class="ghost-button" href="/">Back to inventory</a>
+            <span class="pill" id="car-detail-pill">Loading</span>
+        </div>
+    </header>
+
+    <section class="detail-layout">
+        <div class="detail-gallery panel">
+            <div class="detail-primary-media" id="car-detail-primary-media"></div>
+            <div class="detail-thumb-strip" id="car-detail-thumbs"></div>
+        </div>
+
+        <aside class="detail-sidebar">
+            <section class="panel detail-info-panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="card-label">Listing facts</p>
+                        <h3 id="car-detail-heading">Car summary</h3>
+                    </div>
+                    <span class="pill" id="car-detail-price">Price pending</span>
+                </div>
+                <div class="spec-table" id="car-detail-specs"></div>
+                <p class="panel-copy" id="car-detail-description">Loading description.</p>
+            </section>
+
+            <section class="panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="card-label">Buy now</p>
+                        <h3>Move from interest to checkout.</h3>
+                    </div>
+                </div>
+                <form class="checkout-strip" id="car-detail-buy-form">
+                    <label class="field"><span>Name</span><input class="input" name="name" required></label>
+                    <label class="field"><span>Email</span><input class="input" name="email" type="email" required></label>
+                    <button class="button" type="submit">Buy now</button>
+                    <div class="notice" id="car-detail-buy-status" data-tone="info">Ready when you are.</div>
+                </form>
+            </section>
+        </aside>
+    </section>
+
+    <section class="panel detail-recommendations">
+        <div class="panel-head">
+            <div>
+                <p class="card-label">Similar cars</p>
+                <h3>Five recommended alternatives from visual retrieval.</h3>
+            </div>
+            <span class="pill" id="car-detail-similar-count">0 recommendations</span>
+        </div>
+        <div class="notice" id="car-detail-similar-status" data-tone="info">Loading visually similar cars.</div>
+        <div class="product-grid" id="car-detail-similar-grid"></div>
+    </section>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        window.__wamsInit(function (ui) {
+            var shell = document.querySelector("[data-car-id]");
+            var carId = shell ? shell.getAttribute("data-car-id") : "";
+            var title = document.getElementById("car-detail-title");
+            var copy = document.getElementById("car-detail-copy");
+            var pill = document.getElementById("car-detail-pill");
+            var heading = document.getElementById("car-detail-heading");
+            var price = document.getElementById("car-detail-price");
+            var description = document.getElementById("car-detail-description");
+            var specs = document.getElementById("car-detail-specs");
+            var primaryMedia = document.getElementById("car-detail-primary-media");
+            var thumbs = document.getElementById("car-detail-thumbs");
+            var similarGrid = document.getElementById("car-detail-similar-grid");
+            var similarCount = document.getElementById("car-detail-similar-count");
+            var similarStatus = document.getElementById("car-detail-similar-status");
+            var buyForm = document.getElementById("car-detail-buy-form");
+            var buyStatus = document.getElementById("car-detail-buy-status");
+
+            function renderPrimaryMedia(images, activeIndex) {
+                var source = images[activeIndex] || "";
+                primaryMedia.innerHTML = source
+                    ? "<img src=\"" + ui.escapeHtml(source) + "\" alt=\"" + ui.escapeHtml(title.textContent || "Car image") + "\">"
+                    : "<div class=\"fallback detail\">No image available</div>";
+            }
+
+            function renderThumbs(images) {
+                thumbs.innerHTML = "";
+                images.forEach(function (src, index) {
+                    var button = document.createElement("button");
+                    button.className = "thumb" + (index === 0 ? " is-active" : "");
+                    button.type = "button";
+                    button.innerHTML = "<img src=\"" + ui.escapeHtml(src) + "\" alt=\"Gallery image " + (index + 1) + "\">";
+                    button.addEventListener("click", function () {
+                        renderPrimaryMedia(images, index);
+                        thumbs.querySelectorAll(".thumb").forEach(function (thumb, thumbIndex) {
+                            thumb.classList.toggle("is-active", thumbIndex === index);
+                        });
+                    });
+                    thumbs.appendChild(button);
+                });
+            }
+
+            function renderSpecs(product) {
+                var entries = [
+                    ["Year", product.year || "Current"],
+                    ["Mileage", product.mileage || "Ask seller"],
+                    ["Drive", product.drivetrain || "Listed"],
+                    ["Fuel", product.fuel_type || "Listed"],
+                    ["Gearbox", product.transmission || "Automatic"],
+                    ["Condition", product.condition || "Verified"]
+                ];
+                specs.innerHTML = entries.map(function (entry) {
+                    return "<div><span>" + entry[0] + "</span><strong>" + ui.escapeHtml(String(entry[1])) + "</strong></div>";
+                }).join("");
+            }
+
+            function renderProduct(product) {
+                var images = ui.productImages(product);
+                title.textContent = product.name || "Untitled car";
+                copy.textContent = product.category && product.category.name
+                    ? ("Category: " + product.category.name + ". Open the gallery, review the specs, and compare with similar cars below.")
+                    : "Open the gallery, review the specs, and compare with similar cars below.";
+                pill.textContent = product.year || "Current";
+                heading.textContent = product.name || "Car summary";
+                price.textContent = ui.formatPrice(product.price);
+                description.textContent = product.description || "No description available.";
+                renderSpecs(product);
+                renderPrimaryMedia(images, 0);
+                renderThumbs(images);
+            }
+
+            async function fileFromProduct(product) {
+                var source = ui.imageSource(product);
+                var response;
+                var blob;
+                var name;
+                if (!source) {
+                    throw new Error("This car does not have an image to query with.");
+                }
+                response = await fetch(source);
+                if (!response.ok) {
+                    throw new Error("Could not load the selected car image.");
+                }
+                blob = await response.blob();
+                name = (product.name || "car").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "car";
+                return new File([blob], name + ".jpg", { type: blob.type || "image/jpeg" });
+            }
+
+            async function loadSimilarCars(product) {
+                var queryFile;
+                var payload;
+                var recommendations;
+                ui.setStatus(similarStatus, "info", "Loading recommendations", "Running a visual top-5 retrieval query from this car.");
+                try {
+                    queryFile = await fileFromProduct(product);
+                    payload = await ui.searchWithImage(queryFile, 0.45, 5);
+                    recommendations = (payload.matches || []).filter(function (item) {
+                        return String(item.id) !== String(product.id);
+                    }).slice(0, 5);
+                    ui.renderProductGrid(similarGrid, recommendations, {
+                        showScore: true,
+                        emptyMessage: "No similar cars found.",
+                        onSelect: function (item) {
+                            window.location.href = "/cars/" + encodeURIComponent(item.id) + "/";
+                        }
+                    });
+                    similarCount.textContent = recommendations.length + " recommendation" + (recommendations.length === 1 ? "" : "s");
+                    if (recommendations.length) {
+                        ui.setStatus(similarStatus, "success", "Recommendations ready", "These are the five closest visual matches for this car.");
+                    } else {
+                        ui.setStatus(similarStatus, "info", "No similar cars", payload.detail || "Try another listing.");
+                    }
+                } catch (error) {
+                    ui.renderProductGrid(similarGrid, [], { emptyMessage: "No similar cars found." });
+                    similarCount.textContent = "0 recommendations";
+                    ui.setStatus(similarStatus, "error", "Recommendation query failed", error.message);
+                }
+            }
+
+            buyForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+                ui.setStatus(buyStatus, "success", "Purchase request captured", "Apex Motors demo checkout is ready for the next backend step.");
+            });
+
+            ui.fetchProductById(carId)
+                .then(function (product) {
+                    if (!product) {
+                        throw new Error("Car not found.");
+                    }
+                    renderProduct(product);
+                    loadSimilarCars(product);
+                })
+                .catch(function (error) {
+                    title.textContent = "Car unavailable";
+                    copy.textContent = error.message;
+                    description.textContent = "The requested car could not be loaded.";
+                    primaryMedia.innerHTML = "<div class=\"fallback detail\">Unavailable</div>";
+                    thumbs.innerHTML = "";
+                    specs.innerHTML = "";
+                    pill.textContent = "Unavailable";
+                    price.textContent = "Price pending";
+                    ui.setStatus(similarStatus, "error", "Could not load this car", error.message);
+                    ui.renderProductGrid(similarGrid, [], { emptyMessage: "No similar cars found." });
+                });
+        });
+    })();
+</script>
+{% endblock %}

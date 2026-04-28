@@ -34,6 +34,35 @@ def _cache_key(model_id: str | None = None) -> str:
     return _resolve_spec(model_id).model_id
 
 
+def get_search_thresholds(model_id: str | None = None) -> dict[str, float]:
+    spec = _resolve_spec(model_id)
+    thresholds = {
+        "min_score": 0.45,
+        "ood_top_score": 0.32,
+        "ood_cosine": 0.20,
+    }
+
+    if spec.family == "clip":
+        thresholds.update(
+            {
+                "min_score": 0.42,
+                "ood_top_score": 0.30,
+                "ood_cosine": 0.18,
+            }
+        )
+
+    overrides = getattr(settings, "SEARCH_THRESHOLD_OVERRIDES", {})
+    if isinstance(overrides, dict):
+        family_overrides = overrides.get(spec.family, {})
+        model_overrides = overrides.get(spec.model_id, {})
+        if isinstance(family_overrides, dict):
+            thresholds.update({key: float(value) for key, value in family_overrides.items() if key in thresholds})
+        if isinstance(model_overrides, dict):
+            thresholds.update({key: float(value) for key, value in model_overrides.items() if key in thresholds})
+
+    return thresholds
+
+
 def _collection_name(model_id: str | None = None) -> str:
     return _resolve_spec(model_id).collection_name
 
@@ -134,15 +163,15 @@ def is_query_vector_out_of_distribution(*, vector: list[float], model_id: str | 
         return False
 
     cosine_similarity = sum(left * right for left, right in zip(normalized_vector, mean_vector))
-    return cosine_similarity < getattr(settings, "SEARCH_OOD_COSINE_THRESHOLD", 0.35)
+    return cosine_similarity < get_search_thresholds(model_id)["ood_cosine"]
 
 
-def is_top_hit_below_ood_threshold(*, results) -> bool:
+def is_top_hit_below_ood_threshold(*, results, model_id: str | None = None) -> bool:
     if not results:
         return True
 
     top_score = max(float(getattr(result, "score", 0.0)) for result in results)
-    return top_score < getattr(settings, "SEARCH_OOD_TOP_SCORE_THRESHOLD", 0.45)
+    return top_score < get_search_thresholds(model_id)["ood_top_score"]
 
 
 def upsert_vector(*, vector_id: int | str, vector: list[float], payload: dict, model_id: str | None = None) -> None:

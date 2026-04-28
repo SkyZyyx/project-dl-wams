@@ -1,6 +1,5 @@
 from uuid import uuid4
 
-from django.conf import settings
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
@@ -13,6 +12,7 @@ from .services.preprocess import preprocess_image_bytes
 from .services.qdrant import (
     delete_by_product_id,
     is_top_hit_below_ood_threshold,
+    get_search_thresholds,
     search_vectors,
     upsert_vector,
 )
@@ -68,6 +68,7 @@ class SearchView(APIView):
 
     def post(self, request):
         spec = get_model_spec(get_default_model_id())
+        thresholds = get_search_thresholds(spec.model_id)
         print(
             f"[MODEL_TRACE] search model={spec.model_id} "
             f"collection={spec.collection_name} "
@@ -92,15 +93,16 @@ class SearchView(APIView):
         )
 
         # Keep a conservative floor for weak nearest-neighbor hits.
-        if is_top_hit_below_ood_threshold(results=results):
+        if is_top_hit_below_ood_threshold(results=results, model_id=spec.model_id):
             return Response({"detail": "no similar products found", "matches": []}, status=status.HTTP_200_OK)
 
-        # Filter out individual results below the minimum score floor.
-        min_score = getattr(settings, "SEARCH_MIN_SCORE_THRESHOLD", 0.80)
-        results = [r for r in results if float(getattr(r, "score", 0)) >= min_score]
+        # Filter out individual results below the minimum score floor, but keep a top-five fallback.
+        filtered_results = [r for r in results if float(getattr(r, "score", 0)) >= thresholds["min_score"]]
+        if not filtered_results:
+            filtered_results = results[:5]
 
         matches = []
-        for result in results:
+        for result in filtered_results:
             payload = result.payload or {}
             matches.append(
                 {
@@ -118,5 +120,3 @@ class DeleteIndexView(APIView):
     def delete(self, request, product_id: int):
         delete_by_product_id(product_id)
         return Response({"status": "deleted", "product_id": product_id}, status=status.HTTP_200_OK)
-
-

@@ -113,6 +113,11 @@
                     if (typeof ui.updateRoleBadge === "function") {
                         ui.updateRoleBadge();
                     }
+                    if (role === "seller" || role === "admin") {
+    window.location.href = "/auth/seller/";
+} else {
+    window.location.href = "/";
+}
                     ui.setStatus(status, "success", "Login successful", "Session stored. Current role: " + (role || "unknown") + ".");
                 } catch (error) {
                     ui.setStatus(status, "error", "Login failed", error.message);

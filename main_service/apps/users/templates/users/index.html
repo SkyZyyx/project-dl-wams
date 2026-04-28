@@ -1,47 +1,45 @@
 {% extends "users/base.html" %}
 
-{% block title %}Apex Motors | Buy cars online{% endblock %}
+{% block title %}Apex Motors | Inventory{% endblock %}
 
 {% block content %}
-<section class="market-shell" aria-label="Apex Motors marketplace">
-    <header class="market-hero">
-        <div>
-            <p class="eyebrow">Apex Motors</p>
-            <h1>Cars for sale, auction energy.</h1>
+<section class="showcase-shell" aria-label="Apex Motors inventory">
+    <header class="showcase-hero">
+        <div class="showcase-copy">
+            <p class="eyebrow">Editorial showroom</p>
+            <h1>Find the right car fast, then dive into a focused detail page.</h1>
+            <p class="lede">Browse the full collection, filter by what you remember, and open a dedicated car page for the gallery, specs, buy flow, and similar recommendations.</p>
         </div>
-
+        <aside class="showcase-aside">
+            <div class="status-item">
+                <strong id="inventory-count">Loading inventory</strong>
+                <span>Live product cards from the gateway.</span>
+            </div>
+            <div class="status-item" id="inventory-status">
+                <strong>Searching the catalog</strong>
+                <span>Loading every available car before search filters are applied.</span>
+            </div>
+            <div class="status-item">
+                <strong>Detail-first flow</strong>
+                <span>Open any car to view photos, buy actions, and 5 recommended similar cars.</span>
+            </div>
+        </aside>
     </header>
 
-
-
-    <div class="commerce-board">
-        <aside class="auction-rail">
-            <div class="rail-block">
-                <span>Inventory</span>
-                <strong id="inventory-count">Loading</strong>
+    <section class="catalog-stage">
+        <div class="catalog-toolbar">
+            <div class="field compact catalog-search-field">
+                <label for="inventory-search">Search inventory</label>
+                <input id="inventory-search" class="input catalog-search-input" type="search" placeholder="Search by car name, category, year, drivetrain, or description">
             </div>
-            <div class="rail-block">
-                <span>Buying mode</span>
-                <strong>Buy it now</strong>
+            <div class="catalog-toolbar-meta">
+                <span class="pill" id="inventory-active-filter">All cars</span>
+                <span class="pill">Open a card for full details</span>
             </div>
-            <div class="rail-block">
-                <span>Delivery</span>
-                <strong>Nationwide</strong>
-            </div>
-        </aside>
+        </div>
 
-        <section class="inventory-column" aria-label="All cars">
-            <div class="inventory-grid" id="inventory-grid" aria-live="polite"></div>
-        </section>
-
-        <aside class="listing-panel" id="listing-panel" aria-label="Selected car">
-            <div class="listing-empty">
-                <span>Select</span>
-                <strong>Pick a car</strong>
-                <p>The listing opens here with photos, price, specs, and purchase form.</p>
-            </div>
-        </aside>
-    </div>
+        <div class="inventory-grid inventory-grid-rich" id="inventory-grid" aria-live="polite"></div>
+    </section>
 </section>
 {% endblock %}
 
@@ -50,10 +48,11 @@
     (function () {
         window.__wamsInit(function (ui) {
             var grid = document.getElementById("inventory-grid");
-            var panel = document.getElementById("listing-panel");
             var count = document.getElementById("inventory-count");
+            var status = document.getElementById("inventory-status");
+            var searchInput = document.getElementById("inventory-search");
+            var activeFilter = document.getElementById("inventory-active-filter");
             var inventory = [];
-            var selectedId = null;
 
             var fallbackInventory = [
                 {
@@ -69,9 +68,7 @@
                     drivetrain: "RWD",
                     condition: "Excellent",
                     images: [
-                        { image_url: "https://images.unsplash.com/photo-1619405399517-d7fce0f13302?auto=format&fit=crop&w=1200&q=80" },
-                        { image_url: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=1200&q=80" },
-                        { image_url: "https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=1200&q=80" }
+                        { image_url: "https://images.unsplash.com/photo-1619405399517-d7fce0f13302?auto=format&fit=crop&w=1200&q=80" }
                     ]
                 },
                 {
@@ -87,8 +84,7 @@
                     drivetrain: "AWD",
                     condition: "Certified",
                     images: [
-                        { image_url: "https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=1200&q=80" },
-                        { image_url: "https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=1200&q=80" }
+                        { image_url: "https://images.unsplash.com/photo-1617788138017-80ad40651399?auto=format&fit=crop&w=1200&q=80" }
                     ]
                 },
                 {
@@ -104,8 +100,7 @@
                     drivetrain: "4WD",
                     condition: "Very good",
                     images: [
-                        { image_url: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1200&q=80" },
-                        { image_url: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80" }
+                        { image_url: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=1200&q=80" }
                     ]
                 },
                 {
@@ -121,141 +116,90 @@
                     drivetrain: "RWD",
                     condition: "Collector grade",
                     images: [
-                        { image_url: "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=1200&q=80" },
-                        { image_url: "https://images.unsplash.com/photo-1494905998402-395d579af36f?auto=format&fit=crop&w=1200&q=80" }
+                        { image_url: "https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=1200&q=80" }
                     ]
                 }
             ];
 
-            function categoryText(product) {
-                return product.category && product.category.name ? String(product.category.name).toLowerCase() : "";
+            function inventorySearchText(product) {
+                return [
+                    product.name,
+                    product.description,
+                    product.year,
+                    product.mileage,
+                    product.drivetrain,
+                    product.transmission,
+                    product.fuel_type,
+                    product.condition,
+                    product.category && product.category.name
+                ].join(" ").toLowerCase();
             }
 
-            function productImages(product) {
-                return (product.images || []).map(function (image) {
-                    if (image.image_url) {
-                        return image.image_url;
-                    }
-                    if (image.thumbnail_b64) {
-                        return "data:image/jpeg;base64," + image.thumbnail_b64;
-                    }
-                    return "";
-                }).filter(Boolean);
-            }
-
-            function renderCard(product) {
-                var images = productImages(product);
+            function renderInventoryCard(product) {
+                var images = ui.productImages(product);
                 var image = images[0] || "";
                 var card = document.createElement("article");
-                card.className = "auction-card";
-                card.dataset.productId = product.id;
-                card.tabIndex = 0;
+                card.className = "inventory-tile";
                 card.innerHTML = [
-                    "<div class=\"auction-photo\">" + (image ? "<img src=\"" + ui.escapeHtml(image) + "\" alt=\"" + ui.escapeHtml(product.name || "Car") + "\">" : "<div class=\"fallback\">AP</div>") + "</div>",
-                    "<div class=\"auction-body\">",
-                    "<div class=\"auction-kicker\"><span>" + ui.escapeHtml(categoryText(product) || "car") + "</span><span>" + ui.escapeHtml(String(product.year || "new")) + "</span></div>",
+                    "<a class=\"inventory-link\" href=\"/cars/" + encodeURIComponent(product.id) + "/\">",
+                    "<div class=\"inventory-visual\">" + (image ? "<img src=\"" + ui.escapeHtml(image) + "\" alt=\"" + ui.escapeHtml(product.name || "Car") + "\">" : "<div class=\"fallback\">AP</div>") + "</div>",
+                    "<div class=\"inventory-content\">",
+                    "<div class=\"inventory-meta\"><span>" + ui.escapeHtml(product.category && product.category.name ? product.category.name : "car") + "</span><span>" + ui.escapeHtml(String(product.year || "current")) + "</span></div>",
                     "<h2>" + ui.escapeHtml(product.name || "Untitled car") + "</h2>",
-                    "<p>" + ui.escapeHtml(product.description || "Fresh listing, ready to inspect.") + "</p>",
-                    "<div class=\"auction-price\"><strong>" + ui.formatPrice(product.price) + "</strong><span>" + ui.escapeHtml(String(product.mileage || "Mileage on request")) + "</span></div>",
-                    "</div>"
+                    "<p>" + ui.escapeHtml(product.description || "Curated performance listing.") + "</p>",
+                    "<div class=\"inventory-specs\"><span>" + ui.escapeHtml(String(product.mileage || "Mileage on request")) + "</span><span>" + ui.escapeHtml(String(product.drivetrain || "Drive listed")) + "</span></div>",
+                    "<div class=\"inventory-footer\"><strong>" + ui.formatPrice(product.price) + "</strong><span>Open details</span></div>",
+                    "</div>",
+                    "</a>"
                 ].join("");
-                card.addEventListener("click", function () {
-                    selectProduct(product);
-                });
-                card.addEventListener("keydown", function (event) {
-                    if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        selectProduct(product);
-                    }
-                });
                 return card;
             }
 
-            function renderPanel(product) {
-                var images = productImages(product);
-                var primary = images[0] || "";
-                var specs = [
-                    ["Year", product.year || "Current"],
-                    ["Mileage", product.mileage || "Ask seller"],
-                    ["Drive", product.drivetrain || "Road ready"],
-                    ["Fuel", product.fuel_type || "Listed"],
-                    ["Gearbox", product.transmission || "Automatic"],
-                    ["Condition", product.condition || "Verified"]
-                ];
-                panel.innerHTML = [
-                    "<div class=\"listing-media\">" + (primary ? "<img id=\"listing-main-image\" src=\"" + ui.escapeHtml(primary) + "\" alt=\"" + ui.escapeHtml(product.name || "Selected car") + "\">" : "<div class=\"fallback detail\">No image</div>") + "</div>",
-                    "<div class=\"listing-thumbs\">" + images.map(function (src, index) {
-                        return "<button class=\"thumb" + (index === 0 ? " is-active" : "") + "\" type=\"button\" data-src=\"" + ui.escapeHtml(src) + "\"><img src=\"" + ui.escapeHtml(src) + "\" alt=\"Gallery image " + (index + 1) + "\"></button>";
-                    }).join("") + "</div>",
-                    "<div class=\"listing-copy\">",
-                    "<p class=\"eyebrow\">Selected listing</p>",
-                    "<h2>" + ui.escapeHtml(product.name || "Untitled car") + "</h2>",
-                    "<div class=\"listing-price\">" + ui.formatPrice(product.price) + "</div>",
-                    "<p>" + ui.escapeHtml(product.description || "Contact seller for details.") + "</p>",
-                    "</div>",
-                    "<div class=\"spec-table\">" + specs.map(function (spec) {
-                        return "<div><span>" + spec[0] + "</span><strong>" + ui.escapeHtml(String(spec[1])) + "</strong></div>";
-                    }).join("") + "</div>",
-                    "<form class=\"checkout-strip\" id=\"checkout-form\">",
-                    "<label class=\"field\"><span>Name</span><input class=\"input\" name=\"name\" required></label>",
-                    "<label class=\"field\"><span>Email</span><input class=\"input\" name=\"email\" type=\"email\" required></label>",
-                    "<button class=\"button\" type=\"submit\">Buy it now</button>",
-                    "<div class=\"notice\" id=\"checkout-status\" data-tone=\"info\">Ready.</div>",
-                    "</form>"
-                ].join("");
-
-                panel.querySelectorAll(".thumb").forEach(function (button) {
-                    button.addEventListener("click", function () {
-                        var main = document.getElementById("listing-main-image");
-                        if (main) {
-                            main.src = button.dataset.src;
-                        }
-                        panel.querySelectorAll(".thumb").forEach(function (thumb) {
-                            thumb.classList.toggle("is-active", thumb === button);
-                        });
-                    });
-                });
-
-                panel.querySelector("#checkout-form").addEventListener("submit", function (event) {
-                    event.preventDefault();
-                    ui.setStatus(document.getElementById("checkout-status"), "success", "Offer placed", "Demo purchase captured for " + (product.name || "this car") + ".");
-                });
-            }
-
-            function selectProduct(product) {
-                selectedId = String(product.id);
-                renderPanel(product);
-                grid.querySelectorAll(".auction-card").forEach(function (card) {
-                    card.classList.toggle("is-selected", card.dataset.productId === selectedId);
-                });
-            }
-
-            function renderInventory() {
-                var list = inventory;
+            function renderInventory(list) {
                 grid.innerHTML = "";
-                count.textContent = list.length + " cars";
+                count.textContent = list.length + " cars available";
                 if (!list.length) {
-                    grid.innerHTML = "<div class=\"empty-state\">No cars match this search.</div>";
+                    grid.innerHTML = "<div class=\"empty-state\">No cars match that search yet.</div>";
                     return;
                 }
                 list.forEach(function (product) {
-                    grid.appendChild(renderCard(product));
+                    grid.appendChild(renderInventoryCard(product));
                 });
-                selectProduct(list.find(function (item) {
-                    return String(item.id) === selectedId;
-                }) || list[0]);
             }
 
+            function applySearch() {
+                var query = String(searchInput.value || "").trim().toLowerCase();
+                var filtered = query ? inventory.filter(function (product) {
+                    return inventorySearchText(product).indexOf(query) >= 0;
+                }) : inventory.slice();
+                activeFilter.textContent = query ? ("Search: " + query) : "All cars";
+                if (status) {
+                    status.querySelector("strong").textContent = query ? "Filtering results" : "Browsing the full catalog";
+                    status.querySelector("span").textContent = query
+                        ? ("Showing " + filtered.length + " matching cars.")
+                        : "The page keeps the inventory live and searchable.";
+                }
+                renderInventory(filtered);
+            }
 
+            searchInput.addEventListener("input", applySearch);
 
             ui.loadCollection("/api/products/")
                 .then(function (items) {
                     inventory = items.length ? items : fallbackInventory;
-                    renderInventory();
+                    if (status && items.length) {
+                        status.querySelector("strong").textContent = "Catalog loaded";
+                        status.querySelector("span").textContent = "Loaded " + items.length + " cars from the live inventory API.";
+                    }
+                    applySearch();
                 })
                 .catch(function () {
                     inventory = fallbackInventory;
-                    renderInventory();
+                    if (status) {
+                        status.querySelector("strong").textContent = "Fallback catalog";
+                        status.querySelector("span").textContent = "Live inventory was unavailable, so four showcase cars are displayed instead.";
+                    }
+                    applySearch();
                 });
         });
     })();

@@ -60,8 +60,17 @@ def proxy_search_image(*, image_name: str, image_bytes: bytes, content_type: str
         raise SearchServiceError("search service request failed") from exc
 
 
-def proxy_search_image_with_threshold(*, image_name: str, image_bytes: bytes, content_type: str, score_threshold: float | None) -> dict:
+def proxy_search_image_with_threshold(
+    *,
+    image_name: str,
+    image_bytes: bytes,
+    content_type: str,
+    score_threshold: float | None,
+    limit: int | None = None,
+) -> dict:
     fields = {}
+    if limit is not None:
+        fields["limit"] = str(limit)
     if score_threshold is not None:
         fields["score_threshold"] = str(score_threshold)
     body, boundary = _multipart_body(
@@ -103,5 +112,4 @@ def delete_product_index(product_id: int) -> dict:
         return _json_request("DELETE", url, headers={"Accept": "application/json"})
     except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
         raise SearchServiceError("delete request failed") from exc
-
 

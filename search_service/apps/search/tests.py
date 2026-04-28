@@ -179,6 +179,38 @@ class SearchServiceSmokeTests(TestCase):
     @patch("apps.search.views.search_vectors")
     @patch("apps.search.views.is_query_vector_out_of_distribution")
     @patch("apps.search.views.get_embedder")
+    def test_search_endpoint_keeps_close_but_subthreshold_hits(
+        self,
+        mock_get_embedder,
+        mock_is_query_vector_out_of_distribution,
+        mock_search_vectors,
+        mock_preprocess_image_bytes,
+    ):
+        mock_get_embedder.return_value.embed.return_value = [0.2, 0.3, 0.4]
+        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
+        mock_is_query_vector_out_of_distribution.return_value = False
+        mock_search_vectors.return_value = [
+            SimpleNamespace(id="mid", score=0.41, payload={"product_id": 7, "product_image_id": 11})
+        ]
+        request = self.factory.post(
+            "/api/search/",
+            {"image": make_image_file(), "limit": 3},
+            format="multipart",
+        )
+
+        response = SearchView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["matches"]), 1)
+        self.assertEqual(response.data["matches"][0]["product_id"], 7)
+        self.assertEqual(response.data["matches"][0]["score"], 0.41)
+        mock_search_vectors.assert_called_once()
+        self.assertEqual(mock_search_vectors.call_args.kwargs["limit"], 3)
+
+    @patch("apps.search.views.preprocess_image_bytes")
+    @patch("apps.search.views.search_vectors")
+    @patch("apps.search.views.is_query_vector_out_of_distribution")
+    @patch("apps.search.views.get_embedder")
     def test_search_endpoint_rejects_ood_query(
         self,
         mock_get_embedder,
@@ -419,4 +451,3 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["product_id"], 7)
         mock_delete_by_product_id.assert_called_once_with(7)
-

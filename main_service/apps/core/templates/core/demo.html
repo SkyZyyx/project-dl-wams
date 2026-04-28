@@ -54,11 +54,21 @@
         <div class="section-head" style="margin-top: 4px;">
             <div>
                 <p class="section-label">Matches</p>
-                <h2>Hydrated product results with confidence.</h2>
+                <h2>Top 10 hydrated product results ranked high to low.</h2>
             </div>
             <span class="pill" id="lab-result-count">0 results</span>
         </div>
         <div class="product-grid" id="lab-results"></div>
+
+        <div class="section-head" style="margin-top: 1.5rem;">
+            <div>
+                <p class="section-label">Recommendations</p>
+                <h2>Click a result to find similar products.</h2>
+            </div>
+            <span class="pill" id="lab-similar-count">0 recommendations</span>
+        </div>
+        <div class="notice" id="lab-similar-status" data-tone="info">Select one of the ranked results to run a similar-products query.</div>
+        <div class="product-grid" id="lab-similar-results"></div>
 
         <details class="payload-drawer" style="margin-top: 1rem;">
             <summary>Search payload</summary>
@@ -83,6 +93,9 @@
             var resultCount = document.getElementById("lab-result-count");
             var filePill = document.getElementById("lab-file-pill");
             var searchJson = document.getElementById("lab-search-json");
+            var similarStatus = document.getElementById("lab-similar-status");
+            var similarResults = document.getElementById("lab-similar-results");
+            var similarCount = document.getElementById("lab-similar-count");
 
             var currentFile = null;
 
@@ -100,12 +113,62 @@
                 ui.renderProductGrid(results, items, {
                     showScore: true,
                     featured: true,
-                    emptyMessage: "No matches yet."
+                    emptyMessage: "No matches yet.",
+                    onSelect: runSimilarProductsQuery
                 });
             }
 
             function syncThreshold() {
                 thresholdValue.textContent = Number(threshold.value).toFixed(2);
+            }
+
+            function renderSimilarResults(items) {
+                ui.renderProductGrid(similarResults, items, {
+                    showScore: true,
+                    emptyMessage: "No similar products found yet."
+                });
+            }
+
+            async function fileFromProduct(product) {
+                var source = ui.imageSource(product);
+                var response;
+                var blob;
+                var name;
+                if (!source) {
+                    throw new Error("This product does not have an image to query with.");
+                }
+                response = await fetch(source);
+                if (!response.ok) {
+                    throw new Error("Could not load the selected product image.");
+                }
+                blob = await response.blob();
+                name = (product.name || "similar-product").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "similar-product";
+                return new File([blob], name + ".jpg", { type: blob.type || "image/jpeg" });
+            }
+
+            async function runSimilarProductsQuery(product) {
+                var queryFile;
+                var payload;
+                var similar;
+                ui.setStatus(similarStatus, "info", "Finding similar products", "Running a top-5 recommendation query from the selected product image.");
+                try {
+                    queryFile = await fileFromProduct(product);
+                    payload = await ui.searchWithImage(queryFile, threshold.value, 5);
+                    similar = (payload.matches || []).filter(function (item) {
+                        return String(item.id) !== String(product.id);
+                    }).slice(0, 5);
+                    renderSimilarResults(similar);
+                    similarCount.textContent = similar.length + " recommendation" + (similar.length === 1 ? "" : "s");
+                    if (similar.length) {
+                        ui.setStatus(similarStatus, "success", "Similar products ready", "These are the top-5 nearest matches for the selected product.");
+                    } else {
+                        ui.setStatus(similarStatus, "info", "No similar products", payload.detail || "Try another result or lower the threshold.");
+                    }
+                } catch (error) {
+                    renderSimilarResults([]);
+                    similarCount.textContent = "0 recommendations";
+                    ui.setStatus(similarStatus, "error", "Similar-products query failed", error.message);
+                }
             }
 
             imageInput.addEventListener("change", function () {
@@ -140,9 +203,12 @@
                 imageInput.value = "";
                 setFile(null);
                 renderResults([]);
+                renderSimilarResults([]);
                 searchJson.textContent = "{}";
                 setSearchState("info", "Reset complete", "Choose another image to relaunch the lab.");
                 resultCount.textContent = "0 results";
+                similarCount.textContent = "0 recommendations";
+                ui.setStatus(similarStatus, "info", "Reset complete", "Select one of the ranked results to run a similar-products query.");
             });
 
             runButton.addEventListener("click", async function () {
@@ -156,11 +222,14 @@
                 setSearchState("info", "Running search", "Posting the image as multipart form data to main_service.");
 
                 try {
-                    var searchPayload = await ui.searchWithImage(currentFile, threshold.value);
+                    var searchPayload = await ui.searchWithImage(currentFile, threshold.value, 10);
                     var matches = searchPayload.matches || [];
                     searchJson.textContent = JSON.stringify(searchPayload, null, 2);
                     renderResults(matches);
                     resultCount.textContent = matches.length + " result" + (matches.length === 1 ? "" : "s");
+                    renderSimilarResults([]);
+                    similarCount.textContent = "0 recommendations";
+                    ui.setStatus(similarStatus, "info", "Ready for recommendations", "Click one of the ranked results to run a similar-products query.");
 
                     if (matches.length) {
                         setSearchState("success", matches.length + " products found", "The response is already hydrated by main_service.");
@@ -171,8 +240,11 @@
                 } catch (error) {
                     searchJson.textContent = JSON.stringify({ error: error.message }, null, 2);
                     renderResults([]);
+                    renderSimilarResults([]);
                     resultCount.textContent = "0 results";
+                    similarCount.textContent = "0 recommendations";
                     setSearchState("error", "Lab failed", error.message);
+                    ui.setStatus(similarStatus, "info", "Waiting", "Recommendations need a successful search result first.");
                 } finally {
                     runButton.disabled = false;
                     runButton.textContent = "Run search";
@@ -182,7 +254,9 @@
             syncThreshold();
             setFile(null);
             renderResults([]);
+            renderSimilarResults([]);
             setSearchState("info", "Ready", "Waiting for the first image upload.");
+            ui.setStatus(similarStatus, "info", "Ready", "Select one of the ranked results to run a similar-products query.");
         });
     })();
 </script>

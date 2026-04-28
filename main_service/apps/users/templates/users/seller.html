@@ -2,6 +2,18 @@
 
 {% block title %}Apex Motors | Seller Studio{% endblock %}
 
+{% block head_extra %}
+<script>
+    (function () {
+        var role = String(localStorage.getItem("auth_user_role") || "").trim().toLowerCase();
+        var token = String(localStorage.getItem("auth_access_token") || "").trim();
+        if (!token || (role !== "seller" && role !== "admin")) {
+            window.location.replace("/auth/access-denied/?next=" + encodeURIComponent("/auth/seller/"));
+        }
+    })();
+</script>
+{% endblock %}
+
 {% block content %}
 <section class="auth-grid">
     <div class="auth-panel hero">

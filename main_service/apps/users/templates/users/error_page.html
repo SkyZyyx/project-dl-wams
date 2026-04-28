@@ -1,0 +1,38 @@
+{% extends "users/base.html" %}
+
+{% block title %}Apex Motors | {{ code_label|default:status_code }}{% endblock %}
+
+{% block content %}
+<section class="error-shell" aria-labelledby="error-title">
+    <div class="error-mark">
+        <span class="error-kicker">Apex Motors</span>
+        <strong class="error-code">{{ code_label|default:status_code }}</strong>
+        <span class="error-path">{{ request.path }}</span>
+    </div>
+
+    <div class="error-card panel">
+        <p class="eyebrow">{{ eyebrow }}</p>
+        <h1 id="error-title">{{ title }}</h1>
+        <p class="lede">{{ body }}</p>
+
+        <div class="error-actions">
+            <a class="button" href="{{ primary_href }}">{{ primary_label }}</a>
+            {% if secondary_href and secondary_label %}
+                <a class="ghost-button" href="{{ secondary_href }}">{{ secondary_label }}</a>
+            {% endif %}
+        </div>
+
+        <div class="error-note">
+            <span>Current path</span>
+            <strong>{{ request.path }}</strong>
+        </div>
+
+        {% if next_path %}
+        <div class="error-note">
+            <span>Requested destination</span>
+            <strong>{{ next_path }}</strong>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
