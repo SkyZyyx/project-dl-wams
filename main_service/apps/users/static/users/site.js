@@ -327,7 +327,6 @@
         });
     }
 
-
     async function loadCollection(endpoint) {
         var response = await fetch(endpoint, { headers: { Accept: "application/json" } });
         var text = await response.text();

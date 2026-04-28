@@ -4,7 +4,7 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory
 
 from .models import Category, Product
-from .permissions import ProductOwnerOrAdminPermission, SellerOrAdminWritePermission
+from .permissions import ProductOwnerPermission, SellerWritePermission
 from .serializers import ProductSerializer
 
 
@@ -24,7 +24,7 @@ class ProductPermissionTests(TestCase):
         request = self.factory.post("/api/products/", {"name": "x"}, format="json")
         request.user = _FakeUser(token={"role": "client", "username": "client-1"})
 
-        allowed = SellerOrAdminWritePermission().has_permission(request, None)
+        allowed = SellerWritePermission().has_permission(request, None)
 
         self.assertFalse(allowed)
 
@@ -40,7 +40,7 @@ class ProductPermissionTests(TestCase):
         request = self.factory.patch("/api/products/1/", {"name": "updated"}, format="json")
         request.user = _FakeUser(role="seller", token={"role": "seller", "username": "seller-a"})
 
-        allowed = ProductOwnerOrAdminPermission().has_object_permission(request, None, product)
+        allowed = ProductOwnerPermission().has_object_permission(request, None, product)
 
         self.assertTrue(allowed)
 

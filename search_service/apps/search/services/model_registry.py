@@ -22,7 +22,6 @@ class ModelSpec:
     checkpoint_path: str | None
     vector_size: int
     collection_name: str
-    gradcam_supported: bool
 
 
 def _build_registry() -> dict[str, ModelSpec]:
@@ -40,7 +39,6 @@ def _build_registry() -> dict[str, ModelSpec]:
             checkpoint_path=_optional_path_setting("CLIP_VIT_B32_CHECKPOINT_PATH"),
             vector_size=512,
             collection_name="product_images_clip_vit_b32_pretrained",
-            gradcam_supported=False,
         ),
         "dinov2_base_pretrained": ModelSpec(
             model_id="dinov2_base_pretrained",
@@ -50,7 +48,6 @@ def _build_registry() -> dict[str, ModelSpec]:
             checkpoint_path=None,
             vector_size=768,
             collection_name="product_images_dinov2_base_pretrained",
-            gradcam_supported=True,
         ),
         "dinov2_base_transfer": ModelSpec(
             model_id="dinov2_base_transfer",
@@ -61,7 +58,6 @@ def _build_registry() -> dict[str, ModelSpec]:
             or _optional_path_setting("DINOv2_TRANSFER_CHECKPOINT_PATH"),
             vector_size=768,
             collection_name="product_images_dinov2_base_transfer",
-            gradcam_supported=True,
         ),
         "dinov2_base_finetuned": ModelSpec(
             model_id="dinov2_base_finetuned",
@@ -72,7 +68,6 @@ def _build_registry() -> dict[str, ModelSpec]:
             or _optional_path_setting("DINOv2_FINETUNED_CHECKPOINT_PATH"),
             vector_size=768,
             collection_name="product_images_dinov2_base_finetuned",
-            gradcam_supported=True,
         ),
         "dinov2_base_triplet_finetuned": ModelSpec(
             model_id="dinov2_base_triplet_finetuned",
@@ -90,7 +85,6 @@ def _build_registry() -> dict[str, ModelSpec]:
                 int(getattr(settings, "DINOV2_TRIPLET_FINETUNED_VECTOR_SIZE", getattr(settings, "DINOv2_TRIPLET_FINETUNED_VECTOR_SIZE", 512))),
             ),
             collection_name="product_images_dinov2_base_triplet_finetuned",
-            gradcam_supported=True,
         ),
     }
 

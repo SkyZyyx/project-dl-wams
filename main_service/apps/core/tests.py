@@ -8,7 +8,7 @@ from rest_framework.test import APIRequestFactory
 
 from apps.core.views import DemoPageView
 from apps.users.views import LandingPageView, LoginPageView, ProfilePageView, RegisterPageView
-from .permissions import SellerOrAdminWritePermission
+from .permissions import SellerWritePermission
 from .views import SearchView
 
 
@@ -85,15 +85,19 @@ class PageRenderTests(TestCase):
     def test_home_page_renders_storefront(self):
         content = self.render_view(LandingPageView.as_view())
 
-        self.assertIn("Upload a picture. Shop by instinct.", content)
-        self.assertIn("/api/search/", content)
+        self.assertIn("Cars for sale, auction energy.", content)
+        self.assertIn("auction-card", content)
         self.assertIn("__wamsInit", content)
 
     def test_demo_page_renders_lab(self):
         content = self.render_view(DemoPageView.as_view(), path="/demo/")
 
-        self.assertIn("Search flow and Grad-CAM, fully exposed.", content)
-        self.assertIn("/api/gradcam/", content)
+        self.assertIn("Search flow, fully exposed.", content)
+        self.assertNotIn("/api/gradcam/", content)
+        self.assertNotIn("lab-overlay-preview", content)
+        self.assertNotIn("gradcamWithImage", content)
+        self.assertNotIn("renderOverlay", content)
+        self.assertNotIn("setOverlayState", content)
 
     def test_auth_pages_render(self):
         views = [LoginPageView.as_view(), RegisterPageView.as_view(), ProfilePageView.as_view()]
@@ -116,7 +120,7 @@ class _FakeUser:
 class GatewayPermissionTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.permission = SellerOrAdminWritePermission()
+        self.permission = SellerWritePermission()
 
     def test_write_denied_for_client_role(self):
         request = self.factory.post("/api/products/", {"name": "x"}, format="json")
@@ -126,11 +130,7 @@ class GatewayPermissionTests(TestCase):
 
         self.assertFalse(allowed)
 
-    def test_write_allowed_for_seller_or_admin(self):
+    def test_write_allowed_for_seller(self):
         seller_request = self.factory.post("/api/products/", {"name": "x"}, format="json")
         seller_request.user = _FakeUser(token={"role": "seller"})
-        admin_request = self.factory.post("/api/products/", {"name": "x"}, format="json")
-        admin_request.user = _FakeUser(token={"role": "admin"})
-
         self.assertTrue(self.permission.has_permission(seller_request, None))
-        self.assertTrue(self.permission.has_permission(admin_request, None))

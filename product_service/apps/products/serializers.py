@@ -76,11 +76,11 @@ class ProductSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         username = ""
         if request is not None and getattr(request.user, "is_authenticated", False):
-            username = str(getattr(request.user, "username", "") or "")
+            token = getattr(request.user, "token", None)
+            if token is not None:
+                username = str(token.get("username", "") or "")
             if not username:
-                token = getattr(request.user, "token", None)
-                if token is not None:
-                    username = str(token.get("username", "") or "")
+                username = str(getattr(request.user, "username", "") or "")
         product = Product.objects.create(seller_username=username, **validated_data)
         for index, image_file in enumerate(image_files):
             ProductImage.objects.create(product=product, image=image_file, is_primary=index == 0)

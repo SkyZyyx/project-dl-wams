@@ -12,7 +12,7 @@ from rest_framework.test import APIRequestFactory
 
 from .services.preprocess import preprocess_image_bytes
 from .services.quality import validate_image_quality
-from .views import DeleteIndexView, GradCamView, IndexView, SearchView
+from .views import DeleteIndexView, IndexView, SearchView
 
 
 def make_image_file(name: str = "test.png", size: tuple[int, int] = (128, 128), color=(120, 60, 30)):
@@ -420,19 +420,3 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(response.data["product_id"], 7)
         mock_delete_by_product_id.assert_called_once_with(7)
 
-    @patch("apps.search.views.generate_gradcam_overlay")
-    def test_gradcam_endpoint_returns_overlay(self, mock_generate_gradcam_overlay):
-        mock_generate_gradcam_overlay.return_value = {"overlay_b64": "abc", "width": 128, "height": 128}
-        request = self.factory.post("/api/gradcam/", {"image": make_image_file()}, format="multipart")
-
-        response = GradCamView.as_view()(request)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["overlay_b64"], "abc")
-        mock_generate_gradcam_overlay.assert_called_once()
-
-    def test_gradcam_rejects_unsupported_model_family(self):
-        from .services.visualization import generate_gradcam_overlay
-
-        with self.assertRaisesMessage(ValueError, "gradcam is not supported"):
-            generate_gradcam_overlay(make_image_file().read(), model_id="clip_vit_b32_pretrained")

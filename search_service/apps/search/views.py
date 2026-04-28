@@ -17,7 +17,6 @@ from .services.qdrant import (
     upsert_vector,
 )
 from .services.quality import validate_image_quality
-from .services.visualization import generate_gradcam_overlay
 
 
 class IndexView(APIView):
@@ -121,20 +120,3 @@ class DeleteIndexView(APIView):
         return Response({"status": "deleted", "product_id": product_id}, status=status.HTTP_200_OK)
 
 
-class GradCamView(APIView):
-    parser_classes = [MultiPartParser, FormParser]
-
-    def post(self, request):
-        image_file = request.FILES.get("image")
-        if image_file is None:
-            return Response({"image": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
-
-        image_bytes = image_file.read()
-        ok, reason = validate_image_quality(image_bytes)
-        if not ok:
-            return Response({"detail": reason}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            return Response(generate_gradcam_overlay(image_bytes))
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

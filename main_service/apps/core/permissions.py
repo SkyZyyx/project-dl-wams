@@ -13,23 +13,38 @@ def _token_claim(request, claim_name: str) -> str | None:
 
 
 def _user_role(request) -> str | None:
-    user = request.user
-    role = getattr(user, "role", None)
+    token_role = _token_claim(request, "role")
+    if token_role:
+        return token_role
+    role = getattr(request.user, "role", None)
     if isinstance(role, str) and role:
         return role
-    return _token_claim(request, "role")
-
-
-def _is_admin(request) -> bool:
-    return _user_role(request) == "admin"
+    return None
 
 
 def _is_seller(request) -> bool:
     return _user_role(request) == "seller"
 
 
-class SellerOrAdminWritePermission(BasePermission):
+def _username(request) -> str:
+    token_username = _token_claim(request, "username")
+    if token_username:
+        return token_username
+    username = getattr(request.user, "username", "")
+    if isinstance(username, str) and username:
+        return username
+    return ""
+
+
+class SellerWritePermission(BasePermission):
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
-        return _is_admin(request) or _is_seller(request)
+        return _is_seller(request)
+
+
+class ProductOwnerPermission(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return _is_seller(request) and bool(obj.seller_username) and obj.seller_username == _username(request)

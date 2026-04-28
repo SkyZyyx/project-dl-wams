@@ -5,8 +5,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .permissions import SellerOrAdminWritePermission
-from .services.search_proxy import SearchServiceError, proxy_gradcam_image, proxy_search_image_with_threshold
+from .permissions import ProductOwnerPermission, SellerWritePermission
+from .services.search_proxy import SearchServiceError, proxy_search_image_with_threshold
 
 from .services.catalog_proxy import CatalogServiceError, fetch_products, fetch_products_by_ids, proxy_catalog_write
 
@@ -110,7 +110,7 @@ class SearchView(APIView):
 
 
 class ProductListView(APIView):
-    permission_classes = [SellerOrAdminWritePermission]
+    permission_classes = [SellerWritePermission]
 
     def get(self, request):
         ids = request.query_params.get("ids")
@@ -139,7 +139,7 @@ class ProductListView(APIView):
 
 
 class ProductCategoryView(APIView):
-    permission_classes = [SellerOrAdminWritePermission]
+    permission_classes = [SellerWritePermission]
 
     def get(self, request):
         try:
@@ -169,7 +169,7 @@ class ProductCategoryView(APIView):
 
 
 class ProductImageUploadView(APIView):
-    permission_classes = [SellerOrAdminWritePermission]
+    permission_classes = [SellerWritePermission]
 
     def post(self, request, pk: int):
         try:
@@ -183,26 +183,6 @@ class ProductImageUploadView(APIView):
             return Response(payload, status=status_code)
         except CatalogServiceError as exc:
             return _catalog_error_response(exc)
-
-
-class GradCamView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        image = request.FILES.get("image")
-        if image is None:
-            return Response({"image": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            payload = proxy_gradcam_image(
-                image_name=image.name,
-                image_bytes=image.read(),
-                content_type=getattr(image, "content_type", "application/octet-stream"),
-            )
-        except SearchServiceError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
-
-        return Response(payload)
 
 
 class DemoPageView(TemplateView):

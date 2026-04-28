@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name="UserProfile",
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("role", models.CharField(choices=[("admin", "Admin"), ("seller", "Seller"), ("client", "Client")], default="client", max_length=16)),
+                ("role", models.CharField(choices=[("seller", "Seller"), ("client", "Client")], default="client", max_length=16)),
                 (
                     "user",
                     models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name="profile", to=settings.AUTH_USER_MODEL),

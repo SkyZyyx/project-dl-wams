@@ -249,9 +249,6 @@ services:
       - ./search_service:/app
       - media_data:/app/media
       - ./models:/models
-      - ./retrieval_model.pth:/models/retrieval_model.pth:ro
-      - ./faiss_index.bin:/models/faiss_index.bin:ro
-      - ./gallery_metadata.pkl:/models/gallery_metadata.pkl:ro
     networks:
       default:
         aliases:

@@ -105,18 +105,3 @@ def delete_product_index(product_id: int) -> dict:
         raise SearchServiceError("delete request failed") from exc
 
 
-def proxy_gradcam_image(*, image_name: str, image_bytes: bytes, content_type: str) -> dict:
-    body, boundary = _multipart_body(
-        fields={},
-        files={"image": (image_name, image_bytes, content_type or "application/octet-stream")},
-    )
-    url = f"{settings.SEARCH_SERVICE_URL.rstrip('/')}/api/gradcam/"
-    try:
-        return _json_request(
-            "POST",
-            url,
-            body=body,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"},
-        )
-    except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
-        raise SearchServiceError("gradcam request failed") from exc

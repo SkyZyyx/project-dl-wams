@@ -15,7 +15,6 @@ class BaseImageEmbedder:
         self.source = spec.source
         self.checkpoint_path = spec.checkpoint_path
         self.vector_size = spec.vector_size
-        self.gradcam_supported = spec.gradcam_supported
         self._loaded = False
 
     def _normalize_vector(self, vector):

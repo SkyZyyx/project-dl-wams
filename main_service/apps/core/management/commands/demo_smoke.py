@@ -65,11 +65,4 @@ class Command(BaseCommand):
         if not matches:
             raise CommandError("search endpoint returned no matches")
 
-        with patch("apps.core.views.proxy_gradcam_image") as mock_gradcam_proxy:
-            mock_gradcam_proxy.return_value = {"overlay_b64": "abc", "width": 128, "height": 128}
-            gradcam_response = client.post("/api/gradcam/", {"image": make_image_file(name="overlay.png")})
-
-        if gradcam_response.status_code != 200:
-            raise CommandError(f"gradcam endpoint failed: {gradcam_response.status_code}")
-
         self.stdout.write(self.style.SUCCESS("gateway smoke check passed"))

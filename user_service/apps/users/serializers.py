@@ -6,8 +6,6 @@ from .models import UserProfile, UserRole
 
 
 def _resolve_user_role(user: User) -> str:
-    if user.is_superuser or user.is_staff:
-        return UserRole.ADMIN
     profile = getattr(user, "profile", None)
     if profile and profile.role:
         return profile.role

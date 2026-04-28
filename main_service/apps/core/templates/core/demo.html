@@ -6,8 +6,8 @@
 <section class="hero">
     <div>
         <p class="eyebrow">Advanced lab</p>
-        <h1>Search flow and Grad-CAM, fully exposed.</h1>
-        <p class="lede">This page is for debugging the exact customer journey: image upload, confidence tuning, hydrated product matches, and a second API call for Grad-CAM inspection.</p>
+        <h1>Search flow, fully exposed.</h1>
+        <p class="lede">This page is for debugging the exact customer journey: image upload, confidence tuning, and hydrated product matches.</p>
     </div>
     <aside class="status-card">
         <div class="section-label">Lab protocol</div>
@@ -15,10 +15,6 @@
             <div class="status-item" id="lab-search-status">
                 <strong>Idle</strong>
                 <span>Pick an image to run both endpoints.</span>
-            </div>
-            <div class="status-item" id="lab-overlay-status">
-                <strong>Overlay pending</strong>
-                <span>The Grad-CAM response will render beside the results.</span>
             </div>
         </div>
     </aside>
@@ -187,7 +183,6 @@
             setFile(null);
             renderResults([]);
             setSearchState("info", "Ready", "Waiting for the first image upload.");
-            setOverlayState("info", "Overlay pending", "No Grad-CAM request has been made yet.");
         });
     })();
 </script>
