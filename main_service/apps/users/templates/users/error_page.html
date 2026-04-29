@@ -18,7 +18,7 @@
         <div class="error-actions">
             <a class="button" href="{{ primary_href }}">{{ primary_label }}</a>
             {% if secondary_href and secondary_label %}
-                <a class="ghost-button" href="{{ secondary_href }}">{{ secondary_label }}</a>
+                <a class="ghost-button" id="error-secondary-action" href="{{ secondary_href }}" data-login-label="{{ secondary_label }}" data-login-href="{{ secondary_href }}" data-logout-label="Logout" data-logout-href="/auth/login/">{{ secondary_label }}</a>
             {% endif %}
         </div>
 
@@ -35,4 +35,40 @@
         {% endif %}
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var secondary = document.getElementById("error-secondary-action");
+        if (!secondary) {
+            return;
+        }
+
+        window.__wamsInit(function (ui) {
+            var hasToken = typeof ui.hasToken === "function"
+                ? ui.hasToken()
+                : !!localStorage.getItem("auth_access_token");
+
+            if (!hasToken) {
+                secondary.textContent = secondary.dataset.loginLabel || "Sign in";
+                secondary.href = secondary.dataset.loginHref || "/auth/login/";
+                return;
+            }
+
+            secondary.textContent = secondary.dataset.logoutLabel || "Logout";
+            secondary.href = secondary.dataset.logoutHref || "/auth/login/";
+            secondary.addEventListener("click", function (event) {
+                event.preventDefault();
+                if (typeof ui.clearAuthSession === "function") {
+                    ui.clearAuthSession();
+                } else {
+                    localStorage.removeItem("auth_access_token");
+                    localStorage.removeItem("auth_user_role");
+                }
+                window.location.href = secondary.dataset.logoutHref || "/auth/login/";
+            });
+        });
+    })();
+</script>
 {% endblock %}

@@ -1,0 +1,45 @@
+{% extends "users/base.html" %}
+
+{% block title %}Apex Motors | Admin Dashboard{% endblock %}
+
+{% block head_extra %}
+<script>
+    (function () {
+        var role = String(localStorage.getItem("auth_user_role") || "").trim().toLowerCase();
+        var token = String(localStorage.getItem("auth_access_token") || "").trim();
+        if (!token || role !== "admin") {
+            window.location.replace("/auth/access-denied/?next=" + encodeURIComponent("/auth/dashboard/"));
+        }
+    })();
+</script>
+{% endblock %}
+
+{% block content %}
+<section class="auth-grid">
+    <div class="auth-panel hero">
+        <div>
+            <p class="eyebrow">Admin dashboard</p>
+            <h1 class="auth-title">Operate the demo stack from one place.</h1>
+            <p class="lede">Catalog ops live in product_service. Search ops live in search_service. This page just points you there.</p>
+        </div>
+    </div>
+
+    <div class="auth-panel panel auth-card">
+        <div class="auth-head">
+            <div>
+                <p class="card-label">Control panel</p>
+                <h3>Fast paths for admin work.</h3>
+            </div>
+        </div>
+
+        <div class="form" style="gap: 12px;">
+            <a class="button" href="http://localhost:8002/admin/ops/">Open catalog ops</a>
+            <a class="ghost-button" href="http://localhost:8004/admin/ops/">Open search ops</a>
+            <a class="ghost-button" href="/auth/seller/">Open seller studio</a>
+            <a class="ghost-button" href="/">Back to inventory</a>
+        </div>
+
+        <div class="notice" data-tone="info">This dashboard is for admin sessions only.</div>
+    </div>
+</section>
+{% endblock %}

@@ -33,8 +33,8 @@ class Command(BaseCommand):
             raise CommandError(f"demo page failed: {response.status_code}")
 
         with patch("apps.core.views.proxy_search_image_with_threshold") as mock_search_proxy, patch(
-            "apps.core.views.fetch_products_by_ids"
-        ) as mock_fetch_products_by_ids:
+            "apps.core.views.hydrate_search_matches"
+        ) as mock_hydrate_search_matches:
             mock_search_proxy.return_value = {
                 "matches": [
                     {
@@ -45,14 +45,15 @@ class Command(BaseCommand):
                     }
                 ]
             }
-            mock_fetch_products_by_ids.return_value = [
+            mock_hydrate_search_matches.return_value = [
                 {
                     "id": 101,
                     "name": "Smoke Product",
                     "price": "9.99",
                     "category": {"id": 1, "name": "Smoke", "slug": "smoke"},
+                    "score": 0.93,
                 }
-            ]
+            ], None
             search_response = client.post(
                 "/api/search/",
                 {"image": make_image_file(name="query.png"), "score_threshold": "0.40"},

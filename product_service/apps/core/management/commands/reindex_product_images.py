@@ -3,7 +3,8 @@ from __future__ import annotations
 from django.core.management import BaseCommand
 
 from apps.products.models import ProductImage
-from apps.products.services.search_proxy import SearchServiceError, index_product_image
+from apps.products.lifecycle import index_product_image_record
+from apps.products.services.search_proxy import SearchServiceError
 
 
 class Command(BaseCommand):
@@ -27,14 +28,7 @@ class Command(BaseCommand):
 
         for image in queryset.iterator():
             try:
-                with image.image.open("rb") as image_file:
-                    response = index_product_image(
-                        product_id=image.product_id,
-                        product_image_id=image.id,
-                        image_name=image.image.name.rsplit("/", 1)[-1],
-                        image_bytes=image_file.read(),
-                        content_type=getattr(image.image.file, "content_type", "application/octet-stream"),
-                    )
+                index_product_image_record(image)
             except (SearchServiceError, FileNotFoundError, OSError) as exc:
                 skipped += 1
                 self.stderr.write(
@@ -42,7 +36,6 @@ class Command(BaseCommand):
                 )
                 continue
 
-            ProductImage.objects.filter(pk=image.pk).update(indexed=True, qdrant_id=response.get("qdrant_id"))
             indexed += 1
             self.stdout.write(f"Indexed {indexed}/{total}: product image {image.pk}")
 

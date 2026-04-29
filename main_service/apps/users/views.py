@@ -156,6 +156,10 @@ class SellerPageView(TemplateView):
     template_name = "users/seller.html"
 
 
+class DashboardPageView(TemplateView):
+    template_name = "users/dashboard.html"
+
+
 class AccessDeniedPageView(TemplateView):
     template_name = "users/error_page.html"
     status_code = 403

@@ -216,10 +216,10 @@ services:
   search_service:
     build:
       context: ./search_service
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8004"
+    command: sh -c "python manage.py migrate && exec gunicorn config.wsgi:application --bind 0.0.0.0:8004 --workers 1 --threads 4"
     environment:
       DJANGO_SECRET_KEY: ${SEARCH_DJANGO_SECRET_KEY:-dev-search-secret}
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_DEBUG: ${SEARCH_DJANGO_DEBUG:-0}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,testserver,searchservice,nginx}
       POSTGRES_DB: ${POSTGRES_SEARCH_DB:-postgres_search}
       POSTGRES_USER: ${POSTGRES_USER:-wams}

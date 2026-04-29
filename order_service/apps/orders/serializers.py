@@ -6,6 +6,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .models import Order, OrderItem
+from .services.order_read_policy import product_payload
 from .services.catalog_client import CatalogServiceError, fetch_products_by_ids
 
 
@@ -30,26 +31,7 @@ class OrderItemReadSerializer(serializers.Serializer):
     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2)
 
     def get_product(self, obj: OrderItem):
-        live_map = self.context.get("product_map", {})
-        payload = live_map.get(obj.product_id)
-        if payload is not None:
-            return payload
-
-        category = None
-        if obj.product_category_id is not None:
-            category = {
-                "id": obj.product_category_id,
-                "name": obj.product_category_name,
-                "slug": obj.product_category_slug,
-            }
-
-        return {
-            "id": obj.product_id,
-            "name": obj.product_name,
-            "description": obj.product_description,
-            "price": str(obj.unit_price),
-            "category": category,
-        }
+        return product_payload(obj, self.context.get("product_map", {}))
 
 
 class OrderItemCreateSerializer(serializers.Serializer):

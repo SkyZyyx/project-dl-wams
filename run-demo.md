@@ -11,16 +11,27 @@
    cp .env.example .env
    ```
 3. Start the stack:
+    ```bash
+    docker compose up -d --build
+    ```
+4. Seed demo data and local admins:
    ```bash
-   docker compose up -d --build
+   bash bootstrap-demo.sh
    ```
-4. Seed demo data:
-   ```bash
-   docker compose exec product_service python manage.py seed_demo
-   ```
+   Or run the commands manually:
+    ```bash
+    docker compose exec product_service python manage.py seed_demo
+    docker compose exec product_service python manage.py seed_demo_admin
+    docker compose exec search_service python manage.py seed_demo_admin
+    docker compose exec user_service python manage.py seed_demo_admin
+    ```
 
 ## Notes
 - The seed command now uses KaggleHub to download `jutrera/stanford-car-dataset-by-classes-folder`.
+- `bootstrap-demo.sh` seeds demo products and creates local `admin/admin` superusers in `product_service` and `search_service`.
+- `bootstrap-demo.sh` also creates the main-app login user in `user_service`.
+- Product operations: `http://localhost:8002/admin/ops/`
+- Search operations: `http://localhost:8004/admin/ops/`
 - If you want a different Kaggle dataset later, pass `--dataset-id <owner/dataset-name>`.
 - Each seeded product now gets a chunk of 5 images from the dataset, so product cards can show multiple angles.
 - The `product_service` container reads `KAGGLE_USERNAME` and `KAGGLE_API_TOKEN`.

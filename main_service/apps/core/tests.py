@@ -7,6 +7,8 @@ from django.test import RequestFactory, TestCase
 from rest_framework.test import APIRequestFactory
 
 from apps.core.views import DemoPageView
+from apps.core.services.search_hydration import hydrate_search_matches
+from apps.core.services.catalog_proxy import CatalogServiceError
 from apps.users.views import (
     AccessDeniedPageView,
     CarDetailPageView,
@@ -34,29 +36,75 @@ class SearchProxyTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
 
-    @patch("apps.core.views.fetch_products_by_ids")
+    def test_search_hydration_dedupes_and_sorts_matches(self):
+        def fetch_products_by_ids(product_ids):
+            self.assertEqual(product_ids, [11, 22])
+            return [
+                {
+                    "id": 11,
+                    "name": "Low",
+                    "price": "10.00",
+                    "category": {"id": 1, "name": "Shoes", "slug": "shoes"},
+                },
+                {
+                    "id": 22,
+                    "name": "High",
+                    "price": "20.00",
+                    "category": {"id": 1, "name": "Shoes", "slug": "shoes"},
+                },
+            ]
+
+        matches, detail = hydrate_search_matches(
+            {
+                "matches": [
+                    {"product_id": 11, "product_image_id": 7, "qdrant_id": "a", "score": 0.81},
+                    {"product_id": 22, "product_image_id": 8, "qdrant_id": "b", "score": 0.97},
+                    {"product_id": 11, "product_image_id": 9, "qdrant_id": "c", "score": 0.92},
+                ]
+            },
+            fetch_products_by_ids=fetch_products_by_ids,
+        )
+
+        self.assertIsNone(detail)
+        self.assertEqual([item["id"] for item in matches], [22, 11])
+        self.assertEqual(matches[0]["score"], 0.97)
+        self.assertEqual(matches[1]["score"], 0.92)
+        self.assertEqual(matches[1]["product_image_id"], 9)
+
+    def test_search_hydration_passes_through_detail_without_matches(self):
+        matches, detail = hydrate_search_matches({"matches": [], "detail": "no similar products found"}, fetch_products_by_ids=lambda ids: [])
+
+        self.assertEqual(matches, [])
+        self.assertEqual(detail, "no similar products found")
+
     @patch("apps.core.views.proxy_search_image_with_threshold")
-    def test_search_proxy_hydrates_and_sorts_matches(self, mock_proxy_search_image, mock_fetch_products_by_ids):
+    @patch("apps.core.views.hydrate_search_matches")
+    def test_search_proxy_wraps_search_results(self, mock_hydrate_search_matches, mock_proxy_search_image):
         mock_proxy_search_image.return_value = {
             "matches": [
                 {"product_id": 11, "product_image_id": 7, "qdrant_id": "a", "score": 0.81},
                 {"product_id": 22, "product_image_id": 8, "qdrant_id": "b", "score": 0.97},
             ]
         }
-        mock_fetch_products_by_ids.return_value = [
-            {
-                "id": 11,
-                "name": "Low",
-                "price": "10.00",
-                "category": {"id": 1, "name": "Shoes", "slug": "shoes"},
-            },
-            {
-                "id": 22,
-                "name": "High",
-                "price": "20.00",
-                "category": {"id": 1, "name": "Shoes", "slug": "shoes"},
-            },
-        ]
+        mock_hydrate_search_matches.return_value = (
+            [
+                {
+                    "id": 22,
+                    "name": "High",
+                    "price": "20.00",
+                    "category": {"id": 1, "name": "Shoes", "slug": "shoes"},
+                    "score": 0.97,
+                },
+                {
+                    "id": 11,
+                    "name": "Low",
+                    "price": "10.00",
+                    "category": {"id": 1, "name": "Shoes", "slug": "shoes"},
+                    "score": 0.81,
+                },
+            ],
+            None,
+        )
         request = self.factory.post("/api/search/", {"image": make_image_file(), "score_threshold": "0.65"}, format="multipart")
 
         response = SearchView.as_view()(request)
@@ -66,7 +114,7 @@ class SearchProxyTests(TestCase):
         self.assertEqual(response.data["matches"][0]["score"], 0.97)
         self.assertEqual(response.data["matches"][1]["score"], 0.81)
         mock_proxy_search_image.assert_called_once()
-        mock_fetch_products_by_ids.assert_called_once_with([11, 22])
+        mock_hydrate_search_matches.assert_called_once()
         self.assertEqual(mock_proxy_search_image.call_args.kwargs["image_name"], "query.png")
         self.assertEqual(mock_proxy_search_image.call_args.kwargs["content_type"], "image/png")
         self.assertTrue(mock_proxy_search_image.call_args.kwargs["image_bytes"])
@@ -83,6 +131,18 @@ class SearchProxyTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["detail"], "no similar products found")
         self.assertEqual(response.data["matches"], [])
+
+    @patch("apps.core.views.hydrate_search_matches")
+    @patch("apps.core.views.proxy_search_image_with_threshold")
+    def test_search_proxy_translates_catalog_errors(self, mock_proxy_search_image, mock_hydrate_search_matches):
+        mock_proxy_search_image.return_value = {"matches": [{"product_id": 11, "score": 0.81}]}
+        mock_hydrate_search_matches.side_effect = CatalogServiceError("product service request failed")
+        request = self.factory.post("/api/search/", {"image": make_image_file()}, format="multipart")
+
+        response = SearchView.as_view()(request)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.data["detail"], "product service request failed")
 
 
 class PageRenderTests(TestCase):

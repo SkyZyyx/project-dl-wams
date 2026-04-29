@@ -5,29 +5,10 @@ from rest_framework.response import Response
 
 from .models import Order
 from .serializers import OrderCreateSerializer, OrderReadSerializer
-from .services.catalog_client import CatalogServiceError, fetch_products_by_ids
+from .services.order_read_policy import build_product_map
 
 
-class OrderProductMapMixin:
-    def _build_product_map(self):
-        product_ids = []
-        for order in self.get_queryset():
-            for item in order.items.all():
-                if item.product_id not in product_ids:
-                    product_ids.append(item.product_id)
-
-        if not product_ids:
-            return {}
-
-        try:
-            products = fetch_products_by_ids(product_ids)
-        except CatalogServiceError:
-            return {}
-
-        return {int(product["id"]): product for product in products if product.get("id") is not None}
-
-
-class OrderListCreateView(OrderProductMapMixin, generics.ListCreateAPIView):
+class OrderListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_serializer_class(self):
@@ -40,7 +21,7 @@ class OrderListCreateView(OrderProductMapMixin, generics.ListCreateAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["product_map"] = self._build_product_map()
+        context["product_map"] = build_product_map(self.get_queryset())
         return context
 
     def create(self, request, *args, **kwargs):
@@ -51,7 +32,7 @@ class OrderListCreateView(OrderProductMapMixin, generics.ListCreateAPIView):
         return Response(output.data, status=status.HTTP_201_CREATED)
 
 
-class OrderDetailView(OrderProductMapMixin, generics.RetrieveAPIView):
+class OrderDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderReadSerializer
 
@@ -60,5 +41,5 @@ class OrderDetailView(OrderProductMapMixin, generics.RetrieveAPIView):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["product_map"] = self._build_product_map()
+        context["product_map"] = build_product_map(self.get_queryset())
         return context

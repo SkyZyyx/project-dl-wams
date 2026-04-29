@@ -1,7 +1,11 @@
 from django.contrib import admin
 
 from .models import Category, Product, ProductImage
-from .services.search_proxy import index_product_image
+from .lifecycle import index_product_image_record
+
+admin.site.site_header = "Apex Motors Catalog Control"
+admin.site.site_title = "Catalog Control"
+admin.site.index_title = "Catalog operations"
 
 
 @admin.register(Category)
@@ -39,16 +43,7 @@ class ProductImageAdmin(admin.ModelAdmin):
             if not image.image:
                 continue
 
-            with image.image.open("rb") as image_file:
-                response = index_product_image(
-                    product_id=image.product_id,
-                    product_image_id=image.id,
-                    image_name=image.image.name.rsplit("/", 1)[-1],
-                    image_bytes=image_file.read(),
-                    content_type=getattr(image.image.file, "content_type", "application/octet-stream"),
-                )
-
-            ProductImage.objects.filter(pk=image.pk).update(indexed=True, qdrant_id=response.get("qdrant_id"))
+            index_product_image_record(image)
             updated += 1
 
         self.message_user(request, f"Re-indexed {updated} image(s).")

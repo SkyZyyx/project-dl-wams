@@ -1,0 +1,78 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'search/admin_operations.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ops-shell">
+  <section class="ops-hero">
+    <div>
+      <p class="eyebrow">Vector control room</p>
+      <h1>Search operations</h1>
+      <p class="lede">Reset the active Qdrant collection or clear cached policy data from one focused screen.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="ghost-link" href="{% url 'admin:index' %}">Back to admin</a>
+    </div>
+  </section>
+
+  <section class="stats-grid">
+    <article class="stat-card">
+      <span>Model</span>
+      <strong>{{ state.model_id }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Collection</span>
+      <strong>{{ state.collection_name }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Min score</span>
+      <strong>{{ state.thresholds.min_score }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>OOD floor</span>
+      <strong>{{ state.thresholds.ood_top_score }}</strong>
+    </article>
+  </section>
+
+  <section class="action-grid">
+    <article class="action-card danger">
+      <div>
+        <p class="card-label">Reset</p>
+        <h2>Empty the active collection</h2>
+        <p>Deletes the current collection and recreates an empty one for the active model.</p>
+      </div>
+      <form method="post" class="stack-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reset_collection">
+        <button class="btn btn-danger" type="submit">Reset Qdrant</button>
+      </form>
+    </article>
+
+    <article class="action-card accent">
+      <div>
+        <p class="card-label">Repair</p>
+        <h2>Clear cached policy data</h2>
+        <p>Flushes the mean-vector cache without touching stored vectors.</p>
+      </div>
+      <form method="post" class="stack-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="clear_cache">
+        <button class="btn btn-primary" type="submit">Clear cache</button>
+      </form>
+    </article>
+
+    <article class="action-card warning">
+      <div>
+        <p class="card-label">Note</p>
+        <h2>Reindex lives in product service</h2>
+        <p>Use <code>http://localhost:8002/admin/ops/</code> to push image rows back through the search pipeline.</p>
+      </div>
+      <span class="btn btn-danger-outline" aria-hidden="true">Open product ops in product service</span>
+    </article>
+  </section>
+</div>
+{% endblock %}

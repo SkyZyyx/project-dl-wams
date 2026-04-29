@@ -1,10 +1,14 @@
 from functools import lru_cache
 from io import BytesIO
+import logging
 
 from PIL import Image
 
 from .model_registry import get_model_spec
 from .notebook_artifacts import ClipNotebookEmbedder, create_dino_embedder
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseImageEmbedder:
@@ -43,6 +47,14 @@ class DINOv2Embedder(BaseImageEmbedder):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         self._loaded = True
+        logger.info(
+            "embedder loaded model=%s family=%s source=%s device=%s vector_size=%s",
+            self.model_id,
+            self.family,
+            self.source,
+            self.device,
+            self.vector_size,
+        )
 
     def embed(self, image_bytes: bytes) -> list[float]:
         self._load()
@@ -68,6 +80,14 @@ class CLIPImageEmbedder(BaseImageEmbedder):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
         self._loaded = True
+        logger.info(
+            "embedder loaded model=%s family=%s source=%s device=%s vector_size=%s",
+            self.model_id,
+            self.family,
+            self.source,
+            self.device,
+            self.vector_size,
+        )
 
     def embed(self, image_bytes: bytes) -> list[float]:
         self._load()

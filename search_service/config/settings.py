@@ -115,3 +115,29 @@ SEARCH_PREPROCESS_THRESHOLD = int(os.getenv("SEARCH_PREPROCESS_THRESHOLD", "24")
 SEARCH_PREPROCESS_MIN_AREA_RATIO = float(os.getenv("SEARCH_PREPROCESS_MIN_AREA_RATIO", "0.01"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": LOG_LEVEL,
+    },
+    "loggers": {
+        "django": {"level": LOG_LEVEL, "handlers": ["console"], "propagate": False},
+        "apps.search": {"level": LOG_LEVEL, "handlers": ["console"], "propagate": False},
+    },
+}

@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .permissions import ProductOwnerPermission, SellerWritePermission
+from .services.search_hydration import hydrate_search_matches
 from .services.search_proxy import SearchServiceError, proxy_search_image_with_threshold
 
 from .services.catalog_proxy import CatalogServiceError, fetch_products, fetch_products_by_ids, proxy_catalog_write
@@ -61,58 +62,15 @@ class SearchView(APIView):
         except SearchServiceError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        matches = search_payload.get("matches", [])
-        if not matches:
-            response_data = {"matches": []}
-            detail = search_payload.get("detail")
-            if detail:
-                response_data["detail"] = detail
-            return Response(response_data)
-
-        product_ids = []
-        best_matches = {}
-        for match in matches:
-            product_id = match.get("product_id")
-            if product_id is None:
-                continue
-            score = float(match.get("score") or 0)
-            current = best_matches.get(product_id)
-            if current is None or score > current["score"]:
-                best_matches[product_id] = {
-                    "product_id": product_id,
-                    "product_image_id": match.get("product_image_id"),
-                    "qdrant_id": match.get("qdrant_id"),
-                    "score": score,
-                }
-            if product_id not in product_ids:
-                product_ids.append(product_id)
-
         try:
-            products_payload = fetch_products_by_ids(product_ids)
+            matches, detail = hydrate_search_matches(search_payload, fetch_products_by_ids=fetch_products_by_ids, max_results=10)
         except CatalogServiceError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        products_by_id = {int(product["id"]): product for product in products_payload if product.get("id") is not None}
-
-        hydrated_matches = []
-        for product_id in product_ids:
-            product = products_by_id.get(product_id)
-            match = best_matches.get(product_id)
-            if product is None or match is None:
-                continue
-
-            product_data = dict(product)
-            product_data.update(
-                {
-                    "score": match["score"],
-                    "product_image_id": match["product_image_id"],
-                    "qdrant_id": match["qdrant_id"],
-                }
-            )
-            hydrated_matches.append(product_data)
-
-        hydrated_matches.sort(key=lambda item: item.get("score", 0), reverse=True)
-        return Response({"matches": hydrated_matches[:10]})
+        response_data = {"matches": matches}
+        if detail:
+            response_data["detail"] = detail
+        return Response(response_data)
 
 class ProductListView(APIView):
     permission_classes = [SellerWritePermission]

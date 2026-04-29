@@ -66,6 +66,19 @@ Expected app ports:
 docker compose exec product_service python manage.py seed_demo
 ```
 
+Create local demo admins:
+
+```bash
+docker compose exec product_service python manage.py seed_demo_admin
+docker compose exec search_service python manage.py seed_demo_admin
+docker compose exec user_service python manage.py seed_demo_admin
+```
+
+Open the admin operation dashboards:
+
+- `http://localhost:8002/admin/ops/`
+- `http://localhost:8004/admin/ops/`
+
 First run can take a while because it downloads
 `jutrera/stanford-car-dataset-by-classes-folder` through KaggleHub.
 
@@ -159,6 +172,12 @@ docker compose logs --tail=100 qdrant
 
 If image search returns no UI results but raw search returns IDs, the usual
 cause is stale Qdrant vectors. Run section 5 again.
+
+For a one-shot local bootstrap, run:
+
+```bash
+bash bootstrap-demo.sh
+```
 
 ## 11. Stop Or Reset
 

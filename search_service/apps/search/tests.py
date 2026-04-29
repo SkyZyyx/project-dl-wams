@@ -48,12 +48,12 @@ class SearchServiceSmokeTests(TestCase):
         self.assertFalse(ok)
         self.assertEqual(reason, "image too small")
 
-    @patch("apps.search.views.preprocess_image_bytes")
-    @patch("apps.search.views.upsert_vector")
-    @patch("apps.search.views.get_embedder")
-    def test_index_endpoint_indexes_image(self, mock_get_embedder, mock_upsert_vector, mock_preprocess_image_bytes):
-        mock_get_embedder.return_value.embed.return_value = [0.1, 0.2, 0.3]
-        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
+    @patch("apps.search.views.search_use_case.index_image")
+    def test_index_endpoint_indexes_image(self, mock_index_image):
+        mock_index_image.return_value = SimpleNamespace(
+            data={"status": "indexed", "qdrant_id": 11, "product_id": 7, "product_image_id": 11},
+            status_code=201,
+        )
         request = self.factory.post(
             "/api/index/",
             {"product_id": 7, "product_image_id": 11, "image": make_image_file()},
@@ -64,21 +64,17 @@ class SearchServiceSmokeTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["status"], "indexed")
-        mock_preprocess_image_bytes.assert_called_once()
-        mock_upsert_vector.assert_called_once()
-        self.assertEqual(mock_get_embedder.call_args.args, ())
-        mock_get_embedder.return_value.embed.assert_called_once_with(b"cropped-bytes")
-        self.assertEqual(mock_upsert_vector.call_args.kwargs["payload"]["product_id"], 7)
-        self.assertEqual(mock_upsert_vector.call_args.kwargs["payload"]["product_image_id"], 11)
-        self.assertEqual(mock_upsert_vector.call_args.kwargs["payload"]["filename"], "test.png")
-        self.assertNotIn("model_id", mock_upsert_vector.call_args.kwargs)
+        mock_index_image.assert_called_once()
+        self.assertEqual(mock_index_image.call_args.kwargs["product_id"], 7)
+        self.assertEqual(mock_index_image.call_args.kwargs["product_image_id"], 11)
+        self.assertEqual(mock_index_image.call_args.kwargs["image_name"], "test.png")
 
-    @patch("apps.search.views.preprocess_image_bytes")
-    @patch("apps.search.views.upsert_vector")
-    @patch("apps.search.views.get_embedder")
-    def test_index_endpoint_uses_numeric_point_id(self, mock_get_embedder, mock_upsert_vector, mock_preprocess_image_bytes):
-        mock_get_embedder.return_value.embed.return_value = [0.1, 0.2, 0.3]
-        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
+    @patch("apps.search.views.search_use_case.index_image")
+    def test_index_endpoint_uses_numeric_point_id(self, mock_index_image):
+        mock_index_image.return_value = SimpleNamespace(
+            data={"status": "indexed", "qdrant_id": 11, "product_id": 7, "product_image_id": 11},
+            status_code=201,
+        )
         request = self.factory.post(
             "/api/index/",
             {"product_id": 7, "product_image_id": 11, "image": make_image_file()},
@@ -88,40 +84,32 @@ class SearchServiceSmokeTests(TestCase):
         response = IndexView.as_view()(request)
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(mock_upsert_vector.call_args.kwargs["vector_id"], 11)
-        self.assertNotIn("model_id", mock_upsert_vector.call_args.kwargs)
+        self.assertEqual(mock_index_image.call_args.kwargs["product_image_id"], 11)
 
-    @patch("apps.search.views.preprocess_image_bytes")
-    @patch("apps.search.views.upsert_vector")
-    @patch("apps.search.views.get_embedder")
-    def test_index_endpoint_uses_default_model(self, mock_get_embedder, mock_upsert_vector, mock_preprocess_image_bytes):
-        mock_get_embedder.return_value.embed.return_value = [0.1, 0.2, 0.3]
-        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
+    @patch("apps.search.views.search_use_case.index_image")
+    def test_index_endpoint_uses_default_model(self, mock_index_image):
+        mock_index_image.return_value = SimpleNamespace(
+            data={"status": "indexed", "qdrant_id": "abc", "product_id": 7, "product_image_id": None},
+            status_code=201,
+        )
         request = self.factory.post("/api/index/", {"product_id": 7, "image": make_image_file()}, format="multipart")
 
         response = IndexView.as_view()(request)
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(mock_get_embedder.call_args.args, ())
-        self.assertNotIn("model_id", mock_upsert_vector.call_args.kwargs)
+        self.assertEqual(mock_index_image.call_args.kwargs["product_id"], 7)
+        self.assertIsNone(mock_index_image.call_args.kwargs["product_image_id"])
 
-    @patch("apps.search.views.preprocess_image_bytes")
-    @patch("apps.search.views.search_vectors")
-    @patch("apps.search.views.is_query_vector_out_of_distribution")
-    @patch("apps.search.views.get_embedder")
-    def test_search_endpoint_returns_matches(
-        self,
-        mock_get_embedder,
-        mock_is_query_vector_out_of_distribution,
-        mock_search_vectors,
-        mock_preprocess_image_bytes,
-    ):
-        mock_get_embedder.return_value.embed.return_value = [0.1, 0.2, 0.3]
-        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
-        mock_is_query_vector_out_of_distribution.return_value = False
-        mock_search_vectors.return_value = [
-            SimpleNamespace(id="abc", score=0.91, payload={"product_id": 7, "product_image_id": 11})
-        ]
+    @patch("apps.search.views.search_use_case.search_image")
+    def test_search_endpoint_returns_matches(self, mock_search_image):
+        mock_search_image.return_value = SimpleNamespace(
+            data={
+                "matches": [
+                    {"product_id": 7, "product_image_id": 11, "qdrant_id": "abc", "score": 0.91}
+                ]
+            },
+            status_code=200,
+        )
         request = self.factory.post(
             "/api/search/",
             {"image": make_image_file(), "limit": 3},
@@ -133,32 +121,14 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["matches"][0]["product_id"], 7)
         self.assertEqual(response.data["matches"][0]["qdrant_id"], "abc")
-        mock_preprocess_image_bytes.assert_called_once()
-        self.assertEqual(mock_get_embedder.call_args.args, ())
-        mock_get_embedder.return_value.embed.assert_called_once_with(b"cropped-bytes")
-        mock_is_query_vector_out_of_distribution.assert_called_once()
-        mock_search_vectors.assert_called_once()
-        self.assertEqual(mock_search_vectors.call_args.kwargs["limit"], 3)
-        self.assertIsNone(mock_search_vectors.call_args.kwargs["score_threshold"])
-        self.assertNotIn("model_id", mock_search_vectors.call_args.kwargs)
+        self.assertEqual(mock_search_image.call_args.kwargs["limit"], 3)
+        self.assertIsNone(mock_search_image.call_args.kwargs["score_threshold"])
 
-    @patch("apps.search.views.preprocess_image_bytes")
-    @patch("apps.search.views.search_vectors")
-    @patch("apps.search.views.is_query_vector_out_of_distribution")
-    @patch("apps.search.views.get_embedder")
-    def test_search_endpoint_rejects_low_scoring_top_hit(
-        self,
-        mock_get_embedder,
-        mock_is_query_vector_out_of_distribution,
-        mock_search_vectors,
-        mock_preprocess_image_bytes,
-    ):
-        mock_get_embedder.return_value.embed.return_value = [0.2, 0.3, 0.4]
-        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
-        mock_is_query_vector_out_of_distribution.return_value = False
-        mock_search_vectors.return_value = [
-            SimpleNamespace(id="off", score=0.31, payload={"product_id": 7, "product_image_id": 11})
-        ]
+    @patch("apps.search.views.search_use_case.search_image")
+    def test_search_endpoint_rejects_low_scoring_top_hit(self, mock_search_image):
+        mock_search_image.return_value = SimpleNamespace(
+            data={"detail": "no similar products found", "matches": []}, status_code=200
+        )
         request = self.factory.post(
             "/api/search/",
             {"image": make_image_file(), "limit": 3},
@@ -170,28 +140,14 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["detail"], "no similar products found")
         self.assertEqual(response.data["matches"], [])
-        mock_preprocess_image_bytes.assert_called_once()
-        mock_get_embedder.return_value.embed.assert_called_once_with(b"cropped-bytes")
-        mock_is_query_vector_out_of_distribution.assert_called_once()
-        mock_search_vectors.assert_called_once()
+        mock_search_image.assert_called_once()
 
-    @patch("apps.search.views.preprocess_image_bytes")
-    @patch("apps.search.views.search_vectors")
-    @patch("apps.search.views.is_query_vector_out_of_distribution")
-    @patch("apps.search.views.get_embedder")
-    def test_search_endpoint_keeps_close_but_subthreshold_hits(
-        self,
-        mock_get_embedder,
-        mock_is_query_vector_out_of_distribution,
-        mock_search_vectors,
-        mock_preprocess_image_bytes,
-    ):
-        mock_get_embedder.return_value.embed.return_value = [0.2, 0.3, 0.4]
-        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
-        mock_is_query_vector_out_of_distribution.return_value = False
-        mock_search_vectors.return_value = [
-            SimpleNamespace(id="mid", score=0.41, payload={"product_id": 7, "product_image_id": 11})
-        ]
+    @patch("apps.search.views.search_use_case.search_image")
+    def test_search_endpoint_keeps_close_but_subthreshold_hits(self, mock_search_image):
+        mock_search_image.return_value = SimpleNamespace(
+            data={"matches": [{"product_id": 7, "product_image_id": 11, "qdrant_id": "mid", "score": 0.41}]},
+            status_code=200,
+        )
         request = self.factory.post(
             "/api/search/",
             {"image": make_image_file(), "limit": 3},
@@ -204,23 +160,13 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(len(response.data["matches"]), 1)
         self.assertEqual(response.data["matches"][0]["product_id"], 7)
         self.assertEqual(response.data["matches"][0]["score"], 0.41)
-        mock_search_vectors.assert_called_once()
-        self.assertEqual(mock_search_vectors.call_args.kwargs["limit"], 3)
+        self.assertEqual(mock_search_image.call_args.kwargs["limit"], 3)
 
-    @patch("apps.search.views.preprocess_image_bytes")
-    @patch("apps.search.views.search_vectors")
-    @patch("apps.search.views.is_query_vector_out_of_distribution")
-    @patch("apps.search.views.get_embedder")
-    def test_search_endpoint_rejects_ood_query(
-        self,
-        mock_get_embedder,
-        mock_is_query_vector_out_of_distribution,
-        mock_search_vectors,
-        mock_preprocess_image_bytes,
-    ):
-        mock_get_embedder.return_value.embed.return_value = [1.0, 0.0, 0.0]
-        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
-        mock_is_query_vector_out_of_distribution.return_value = True
+    @patch("apps.search.views.search_use_case.search_image")
+    def test_search_endpoint_rejects_ood_query(self, mock_search_image):
+        mock_search_image.return_value = SimpleNamespace(
+            data={"detail": "no similar products found", "matches": []}, status_code=200
+        )
         request = self.factory.post(
             "/api/search/",
             {"image": make_image_file(), "limit": 3},
@@ -232,9 +178,83 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["detail"], "no similar products found")
         self.assertEqual(response.data["matches"], [])
+        mock_search_image.assert_called_once()
+
+    @patch("apps.search.services.search_use_case.upsert_vector")
+    @patch("apps.search.services.search_use_case.get_embedder")
+    @patch("apps.search.services.search_use_case.preprocess_image_bytes")
+    @patch("apps.search.services.search_use_case.validate_image_quality")
+    def test_index_use_case_indexes_image(self, mock_validate_image_quality, mock_preprocess_image_bytes, mock_get_embedder, mock_upsert_vector):
+        from .services.search_use_case import index_image
+
+        mock_validate_image_quality.return_value = (True, "")
+        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
+        mock_get_embedder.return_value.embed.return_value = [0.1, 0.2, 0.3]
+
+        result = index_image(image_bytes=make_image_file().read(), image_name="test.png", product_id=7, product_image_id=11)
+
+        self.assertEqual(result.status_code, 201)
+        self.assertEqual(result.data["status"], "indexed")
         mock_preprocess_image_bytes.assert_called_once()
         mock_get_embedder.return_value.embed.assert_called_once_with(b"cropped-bytes")
-        mock_is_query_vector_out_of_distribution.assert_called_once()
+        self.assertEqual(mock_upsert_vector.call_args.kwargs["payload"]["filename"], "test.png")
+
+    @patch("apps.search.services.search_use_case.search_vectors")
+    @patch("apps.search.services.search_use_case.is_top_hit_below_ood_threshold")
+    @patch("apps.search.services.search_use_case.is_query_vector_out_of_distribution")
+    @patch("apps.search.services.search_use_case.get_embedder")
+    @patch("apps.search.services.search_use_case.preprocess_image_bytes")
+    @patch("apps.search.services.search_use_case.validate_image_quality")
+    def test_search_use_case_returns_matches(
+        self,
+        mock_validate_image_quality,
+        mock_preprocess_image_bytes,
+        mock_get_embedder,
+        mock_is_query_vector_out_of_distribution,
+        mock_is_top_hit_below_ood_threshold,
+        mock_search_vectors,
+    ):
+        from .services.search_use_case import search_image
+
+        mock_validate_image_quality.return_value = (True, "")
+        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
+        mock_get_embedder.return_value.embed.return_value = [0.1, 0.2, 0.3]
+        mock_is_query_vector_out_of_distribution.return_value = False
+        mock_is_top_hit_below_ood_threshold.return_value = False
+        mock_search_vectors.return_value = [
+            SimpleNamespace(id="abc", score=0.91, payload={"product_id": 7, "product_image_id": 11})
+        ]
+
+        result = search_image(image_bytes=make_image_file().read(), limit=3)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.data["matches"][0]["qdrant_id"], "abc")
+        mock_search_vectors.assert_called_once()
+
+    @patch("apps.search.services.search_use_case.search_vectors")
+    @patch("apps.search.services.search_use_case.is_query_vector_out_of_distribution")
+    @patch("apps.search.services.search_use_case.get_embedder")
+    @patch("apps.search.services.search_use_case.preprocess_image_bytes")
+    @patch("apps.search.services.search_use_case.validate_image_quality")
+    def test_search_use_case_rejects_ood_query(
+        self,
+        mock_validate_image_quality,
+        mock_preprocess_image_bytes,
+        mock_get_embedder,
+        mock_is_query_vector_out_of_distribution,
+        mock_search_vectors,
+    ):
+        from .services.search_use_case import search_image
+
+        mock_validate_image_quality.return_value = (True, "")
+        mock_preprocess_image_bytes.return_value = b"cropped-bytes"
+        mock_get_embedder.return_value.embed.return_value = [1.0, 0.0, 0.0]
+        mock_is_query_vector_out_of_distribution.return_value = True
+
+        result = search_image(image_bytes=make_image_file().read(), limit=3)
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.data["matches"], [])
         mock_search_vectors.assert_not_called()
 
     def test_preprocess_image_bytes_crops_foreground_object(self):
@@ -306,14 +326,15 @@ class SearchServiceSmokeTests(TestCase):
         payload = json.loads(request.data.decode("utf-8"))
         self.assertNotIn("score_threshold", payload)
 
-    @patch("apps.search.services.qdrant.get_client")
-    def test_collection_mean_vector_scans_qdrant_points(self, mock_get_client):
+    @patch("apps.search.services.qdrant_policy.ensure_collection")
+    @patch("apps.search.services.qdrant_policy.get_client")
+    def test_collection_mean_vector_scans_qdrant_points(self, mock_get_client, mock_ensure_collection):
         mock_get_client.return_value.scroll.side_effect = [
             ([SimpleNamespace(vector=[1.0, 0.0])], "cursor-1"),
             ([SimpleNamespace(vector=[0.0, 1.0])], None),
         ]
 
-        from .services.qdrant import clear_collection_mean_vector_cache, get_collection_mean_vector
+        from .services.qdrant_policy import clear_collection_mean_vector_cache, get_collection_mean_vector
 
         clear_collection_mean_vector_cache()
         mean_vector = get_collection_mean_vector()
@@ -389,9 +410,10 @@ class SearchServiceSmokeTests(TestCase):
         vector_params = mock_get_client.return_value.create_collection.call_args.kwargs["vectors_config"]
         self.assertEqual(vector_params.size, 512)
 
-    @patch("apps.search.services.qdrant.get_client")
-    def test_collection_mean_cache_is_isolated_per_model(self, mock_get_client):
-        from .services.qdrant import clear_collection_mean_vector_cache, get_collection_mean_vector
+    @patch("apps.search.services.qdrant_policy.ensure_collection")
+    @patch("apps.search.services.qdrant_policy.get_client")
+    def test_collection_mean_cache_is_isolated_per_model(self, mock_get_client, mock_ensure_collection):
+        from .services.qdrant_policy import clear_collection_mean_vector_cache, get_collection_mean_vector
 
         mock_get_client.return_value.scroll.side_effect = [
             ([SimpleNamespace(vector=[1.0, 0.0])], None),
@@ -406,37 +428,27 @@ class SearchServiceSmokeTests(TestCase):
         self.assertEqual(mock_get_client.return_value.scroll.call_count, 2)
         self.assertNotEqual(dino_mean, clip_mean)
 
-    @patch("apps.search.services.qdrant.ensure_collection")
+    @patch("apps.search.services.qdrant_policy.clear_collection_mean_vector_cache")
     @patch("apps.search.services.qdrant.get_client")
-    def test_upsert_vector_clears_only_affected_model_mean_cache(self, mock_get_client, mock_ensure_collection):
-        from .services.qdrant import _COLLECTION_MEAN_CACHE, upsert_vector
-
-        _COLLECTION_MEAN_CACHE.clear()
-        _COLLECTION_MEAN_CACHE["dinov2_base_pretrained"] = [1.0]
-        _COLLECTION_MEAN_CACHE["clip_vit_b32_pretrained"] = [2.0]
+    def test_upsert_vector_clears_only_affected_model_mean_cache(self, mock_get_client, mock_clear_cache):
+        from .services.qdrant import upsert_vector
 
         upsert_vector(vector_id=1, vector=[0.1, 0.2], payload={"product_id": 1}, model_id="dinov2_base_pretrained")
 
-        self.assertNotIn("dinov2_base_pretrained", _COLLECTION_MEAN_CACHE)
-        self.assertIn("clip_vit_b32_pretrained", _COLLECTION_MEAN_CACHE)
+        mock_clear_cache.assert_called_once_with("dinov2_base_pretrained")
         self.assertEqual(
             mock_get_client.return_value.upsert.call_args.kwargs["collection_name"],
             "product_images_dinov2_base_pretrained",
         )
 
-    @patch("apps.search.services.qdrant.ensure_collection")
+    @patch("apps.search.services.qdrant_policy.clear_collection_mean_vector_cache")
     @patch("apps.search.services.qdrant.get_client")
-    def test_delete_by_product_id_clears_only_affected_model_mean_cache(self, mock_get_client, mock_ensure_collection):
-        from .services.qdrant import _COLLECTION_MEAN_CACHE, delete_by_product_id
-
-        _COLLECTION_MEAN_CACHE.clear()
-        _COLLECTION_MEAN_CACHE["dinov2_base_pretrained"] = [1.0]
-        _COLLECTION_MEAN_CACHE["clip_vit_b32_pretrained"] = [2.0]
+    def test_delete_by_product_id_clears_only_affected_model_mean_cache(self, mock_get_client, mock_clear_cache):
+        from .services.qdrant import delete_by_product_id
 
         delete_by_product_id(7, model_id="clip_vit_b32_pretrained")
 
-        self.assertNotIn("clip_vit_b32_pretrained", _COLLECTION_MEAN_CACHE)
-        self.assertIn("dinov2_base_pretrained", _COLLECTION_MEAN_CACHE)
+        mock_clear_cache.assert_called_once_with("clip_vit_b32_pretrained")
         self.assertEqual(
             mock_get_client.return_value.delete.call_args.kwargs["collection_name"],
             "product_images_clip_vit_b32_pretrained",

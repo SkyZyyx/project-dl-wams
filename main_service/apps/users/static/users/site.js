@@ -298,6 +298,7 @@
         var loginLink = document.getElementById("nav-login");
         var registerLink = document.getElementById("nav-register");
         var profileLink = document.getElementById("nav-profile");
+        var dashboardLink = document.getElementById("nav-dashboard");
         var sellLink = document.getElementById("nav-sell");
         var logoutLink = document.getElementById("nav-logout");
         var authenticated = hasToken();
@@ -311,6 +312,9 @@
         }
         if (profileLink) {
             profileLink.hidden = !authenticated;
+        }
+        if (dashboardLink) {
+            dashboardLink.hidden = !authenticated || role !== "admin";
         }
         if (sellLink) {
             sellLink.hidden = !authenticated || (role !== "seller" && role !== "admin");

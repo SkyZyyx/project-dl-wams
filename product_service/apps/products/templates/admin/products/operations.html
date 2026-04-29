@@ -1,0 +1,140 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'products/admin_operations.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ops-shell">
+  <section class="ops-hero">
+    <div>
+      <p class="eyebrow">Catalog control room</p>
+      <h1>Product operations</h1>
+      <p class="lede">Delete rows, refresh image indexes, and keep the catalog clean without leaving the admin.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="ghost-link" href="{% url 'admin:index' %}">Back to admin</a>
+    </div>
+  </section>
+
+  <section class="stats-grid">
+    <article class="stat-card">
+      <span>Categories</span>
+      <strong>{{ stats.categories }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Products</span>
+      <strong>{{ stats.products }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Images</span>
+      <strong>{{ stats.images }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Indexed</span>
+      <strong>{{ stats.indexed_images }}</strong>
+    </article>
+  </section>
+
+  <section class="action-grid">
+    <article class="action-card danger">
+      <div>
+        <p class="card-label">Destructive</p>
+        <h2>Delete one product</h2>
+        <p>Choose a row below or enter an id. Deleting a product also clears its product images and vectors.</p>
+      </div>
+      <form method="post" class="stack-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_product">
+        <label>
+          Product
+          <select name="product_id" required>
+            <option value="">Select a product</option>
+            {% for product in recent_products %}
+              <option value="{{ product.id }}">#{{ product.id }} · {{ product.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="btn btn-danger" type="submit">Delete product</button>
+      </form>
+    </article>
+
+    <article class="action-card warning">
+      <div>
+        <p class="card-label">Bulk action</p>
+        <h2>Delete everything</h2>
+        <p>This removes the entire catalog. It is intentionally hard to trigger.</p>
+      </div>
+      <form method="post" class="stack-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_all_products">
+        <label>
+          Confirmation
+          <input name="confirmation" placeholder="DELETE ALL" autocomplete="off">
+        </label>
+        <button class="btn btn-danger-outline" type="submit">Delete all products</button>
+      </form>
+    </article>
+
+    <article class="action-card accent">
+      <div>
+        <p class="card-label">Repair</p>
+        <h2>Reindex images</h2>
+        <p>Push all product images back through search_service and refresh the vector index.</p>
+      </div>
+      <form method="post" class="stack-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reindex_all_images">
+        <button class="btn btn-primary" type="submit">Reindex all images</button>
+      </form>
+    </article>
+  </section>
+
+  <section class="table-shell">
+    <div class="table-head">
+      <div>
+        <p class="card-label">Recent rows</p>
+        <h2>Quick delete list</h2>
+      </div>
+      <p>Latest 24 products.</p>
+    </div>
+    <div class="table-wrap">
+      <table class="ops-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in recent_products %}
+            <tr>
+              <td>#{{ product.id }}</td>
+              <td>{{ product.name }}</td>
+              <td>{{ product.category.name }}</td>
+              <td>{{ product.price }}</td>
+              <td>
+                <form method="post" class="inline-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_product">
+                  <input type="hidden" name="product_id" value="{{ product.id }}">
+                  <button class="btn btn-danger-outline btn-small" type="submit">Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="empty-state">No products yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
