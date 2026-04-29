@@ -1,3 +1,5 @@
+import logging
+
 from django.db import connection
 from django.views.generic import TemplateView
 from rest_framework import permissions, status
@@ -7,9 +9,12 @@ from rest_framework.views import APIView
 
 from .permissions import ProductOwnerPermission, SellerWritePermission
 from .services.search_hydration import hydrate_search_matches
-from .services.search_proxy import SearchServiceError, proxy_search_image_with_threshold
+from .services.search_proxy import SearchServiceError, delete_product_index, proxy_search_image_with_threshold
 
 from .services.catalog_proxy import CatalogServiceError, fetch_products, fetch_products_by_ids, proxy_catalog_write
+
+
+logger = logging.getLogger(__name__)
 
 
 def _catalog_error_response(exc: CatalogServiceError):
@@ -62,8 +67,20 @@ class SearchView(APIView):
         except SearchServiceError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
+        def prune_missing_products(product_ids: list[int]) -> None:
+            for product_id in product_ids:
+                try:
+                    delete_product_index(product_id)
+                except SearchServiceError:
+                    logger.warning("failed to prune stale qdrant vectors for product_id=%s", product_id)
+
         try:
-            matches, detail = hydrate_search_matches(search_payload, fetch_products_by_ids=fetch_products_by_ids, max_results=10)
+            matches, detail = hydrate_search_matches(
+                search_payload,
+                fetch_products_by_ids=fetch_products_by_ids,
+                max_results=10,
+                on_missing_products=prune_missing_products,
+            )
         except CatalogServiceError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 

@@ -77,6 +77,31 @@ class SearchProxyTests(TestCase):
         self.assertEqual(matches, [])
         self.assertEqual(detail, "no similar products found")
 
+    def test_search_hydration_prunes_missing_products(self):
+        pruned = []
+
+        matches, detail = hydrate_search_matches(
+            {
+                "matches": [
+                    {"product_id": 11, "product_image_id": 7, "qdrant_id": "a", "score": 0.81},
+                    {"product_id": 22, "product_image_id": 8, "qdrant_id": "b", "score": 0.97},
+                ]
+            },
+            fetch_products_by_ids=lambda ids: [
+                {
+                    "id": 11,
+                    "name": "Low",
+                    "price": "10.00",
+                    "category": {"id": 1, "name": "Shoes", "slug": "shoes"},
+                }
+            ],
+            on_missing_products=pruned.extend,
+        )
+
+        self.assertEqual([item["id"] for item in matches], [11])
+        self.assertEqual(pruned, [22])
+        self.assertIsNone(detail)
+
     @patch("apps.core.views.proxy_search_image_with_threshold")
     @patch("apps.core.views.hydrate_search_matches")
     def test_search_proxy_wraps_search_results(self, mock_hydrate_search_matches, mock_proxy_search_image):

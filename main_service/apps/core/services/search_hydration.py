@@ -8,6 +8,7 @@ def hydrate_search_matches(
     *,
     fetch_products_by_ids: Callable[[list[int]], list[dict]],
     max_results: int = 10,
+    on_missing_products: Callable[[list[int]], None] | None = None,
 ) -> tuple[list[dict], str | None]:
     matches = search_payload.get("matches", [])
     detail = search_payload.get("detail")
@@ -37,6 +38,10 @@ def hydrate_search_matches(
 
     products_payload = fetch_products_by_ids(product_ids)
     products_by_id = {int(product["id"]): product for product in products_payload if product.get("id") is not None}
+
+    missing_product_ids = [product_id for product_id in product_ids if product_id not in products_by_id]
+    if missing_product_ids and on_missing_products is not None:
+        on_missing_products(missing_product_ids)
 
     hydrated_matches = []
     for product_id in product_ids:
