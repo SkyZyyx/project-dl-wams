@@ -2,7 +2,7 @@ Pour lancer le projet vous avez quelques commandes a faire
 
 deja telecharger le model .pth qui est dans le lien drive 
 https://drive.google.com/drive/folders/1sNTF-pPDOP0UBy6idkOHfX5kx4Cq-WdM?usp=sharing
-
+https://www.youtube.com/watch?v=0BuMdmhBt1U
 faire la commande : cp .env.example .env
 
 on a fait un script en bash qui lance tous sa et seed la database et index les images et cree des admins ,
