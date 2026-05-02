@@ -83,7 +83,8 @@ def proxy_catalog_write(
     try:
         with urllib_request.urlopen(request, timeout=settings.UPSTREAM_TIMEOUT_SECONDS) as response:
             status_code = response.getcode()
-            payload = json.loads(response.read().decode("utf-8"))
+            raw = response.read().decode("utf-8")
+            payload = json.loads(raw) if raw else {}
             return status_code, payload
     except urllib_error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="ignore")

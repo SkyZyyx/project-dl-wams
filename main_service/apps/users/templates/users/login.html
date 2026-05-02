@@ -53,6 +53,15 @@
                     var value = String(role || "").trim().toLowerCase();
                     return (value === "admin" || value === "seller" || value === "client") ? value : "";
                 };
+            var roleLabel = typeof ui.roleLabel === "function"
+                ? ui.roleLabel
+                : function (role) {
+                    var value = normalizeRole(role);
+                    if (value === "admin") {
+                        return "Access ALL";
+                    }
+                    return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+                };
             var setSession = typeof ui.setAuthSession === "function"
                 ? ui.setAuthSession
                 : function (token, role) {
@@ -120,7 +129,7 @@
                     } else {
                         window.location.href = "/";
                     }
-                    ui.setStatus(status, "success", "Login successful", "Session stored. Current role: " + (role || "unknown") + ".");
+                    ui.setStatus(status, "success", "Login successful", "Session stored. Current role: " + (roleLabel(role) || "unknown") + ".");
                 } catch (error) {
                     ui.setStatus(status, "error", "Login failed", error.message);
                 }

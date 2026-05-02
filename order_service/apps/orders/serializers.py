@@ -61,8 +61,8 @@ class OrderCreateSerializer(serializers.Serializer):
         products = self._fetch_products(items_data)
         order = Order.objects.create(
             user_id=user_id,
-            user_username=getattr(user, "username", ""),
-            user_email=getattr(user, "email", ""),
+            user_username=getattr(user, "username", None) or "",
+            user_email=getattr(user, "email", None) or "",
         )
 
         for item_data in items_data:

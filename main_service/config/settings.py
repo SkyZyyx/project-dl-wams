@@ -105,6 +105,7 @@ SIMPLE_JWT = {
 }
 
 PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://productservice:8002")
+ORDER_SERVICE_URL = os.getenv("ORDER_SERVICE_URL", "http://orderservice:8003")
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://userservice:8001")
 SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://searchservice:8004")
 SEARCH_SERVICE_TIMEOUT_SECONDS = float(os.getenv("SEARCH_SERVICE_TIMEOUT_SECONDS", "10"))

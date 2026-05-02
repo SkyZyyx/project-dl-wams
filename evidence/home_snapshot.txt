@@ -1,3 +1,0 @@
-uid=1_0 RootWebArea "404 Not Found" url="http://localhost:8080/"
-  uid=1_1 heading "404 Not Found" level="1"
-  uid=1_2 StaticText "nginx/1.27.5"

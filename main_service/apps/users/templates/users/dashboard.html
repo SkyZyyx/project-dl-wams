@@ -18,9 +18,9 @@
 <section class="auth-grid">
     <div class="auth-panel hero">
         <div>
-            <p class="eyebrow">Admin dashboard</p>
-            <h1 class="auth-title">Operate the demo stack from one place.</h1>
-            <p class="lede">Catalog ops live in product_service. Search ops live in search_service. This page just points you there.</p>
+            <p class="eyebrow">Access ALL dashboard</p>
+            <h1 class="auth-title">Run the whole stack from one place.</h1>
+            <p class="lede">Admin sessions can manage users, products, orders, and search tools from this panel.</p>
         </div>
     </div>
 
@@ -28,18 +28,21 @@
         <div class="auth-head">
             <div>
                 <p class="card-label">Control panel</p>
-                <h3>Fast paths for admin work.</h3>
+                <h3>Direct access to every admin surface.</h3>
             </div>
         </div>
 
         <div class="form" style="gap: 12px;">
-            <a class="button" href="http://localhost:8002/admin/ops/">Open catalog ops</a>
+            <a class="button" href="http://localhost:8001/admin/">Open user admin</a>
+            <a class="ghost-button" href="http://localhost:8002/admin/">Open product admin</a>
+            <a class="ghost-button" href="http://localhost:8002/admin/ops/">Open catalog ops</a>
+            <a class="ghost-button" href="http://localhost:8003/admin/">Open order admin</a>
             <a class="ghost-button" href="http://localhost:8004/admin/ops/">Open search ops</a>
             <a class="ghost-button" href="/auth/seller/">Open seller studio</a>
             <a class="ghost-button" href="/">Back to inventory</a>
         </div>
 
-        <div class="notice" data-tone="info">This dashboard is for admin sessions only.</div>
+        <div class="notice" data-tone="info">This dashboard is the full-access admin entry point.</div>
     </div>
 </section>
 {% endblock %}

@@ -8,6 +8,23 @@ from .serializers import OrderCreateSerializer, OrderReadSerializer
 from .services.order_read_policy import build_product_map
 
 
+def _request_role(request) -> str:
+    token = getattr(request.user, "token", None)
+    if token is not None:
+        role = token.get("role")
+        if isinstance(role, str):
+            return role.strip().lower()
+
+    role = getattr(request.user, "role", "")
+    if isinstance(role, str):
+        return role.strip().lower()
+    return ""
+
+
+def _can_manage_orders(request) -> bool:
+    return _request_role(request) in {"client", "admin"}
+
+
 class OrderListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -25,6 +42,12 @@ class OrderListCreateView(generics.ListCreateAPIView):
         return context
 
     def create(self, request, *args, **kwargs):
+        if not _can_manage_orders(request):
+            return Response(
+                {"detail": "Only client or admin accounts can place orders."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         order = serializer.save(user=request.user)

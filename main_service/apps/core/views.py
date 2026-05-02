@@ -12,12 +12,18 @@ from .services.search_hydration import hydrate_search_matches
 from .services.search_proxy import SearchServiceError, delete_product_index, proxy_search_image_with_threshold
 
 from .services.catalog_proxy import CatalogServiceError, fetch_products, fetch_products_by_ids, proxy_catalog_write
+from .services.order_proxy import OrderServiceError, proxy_order_request
 
 
 logger = logging.getLogger(__name__)
 
 
 def _catalog_error_response(exc: CatalogServiceError):
+    payload = exc.payload if exc.payload is not None else {"detail": exc.detail}
+    return Response(payload, status=exc.status_code)
+
+
+def _order_error_response(exc: OrderServiceError):
     payload = exc.payload if exc.payload is not None else {"detail": exc.detail}
     return Response(payload, status=exc.status_code)
 
@@ -163,6 +169,105 @@ class ProductImageUploadView(APIView):
             return Response(payload, status=status_code)
         except CatalogServiceError as exc:
             return _catalog_error_response(exc)
+
+
+class ProductDetailProxyView(APIView):
+    permission_classes = [SellerWritePermission]
+
+    def get(self, request, pk: int):
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="GET",
+                path=f"/api/products/{pk}/",
+                body=b"",
+                content_type="application/json",
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
+
+    def patch(self, request, pk: int):
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="PATCH",
+                path=f"/api/products/{pk}/",
+                body=request.body,
+                content_type=request.META.get("CONTENT_TYPE", "application/json"),
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
+
+    def put(self, request, pk: int):
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="PUT",
+                path=f"/api/products/{pk}/",
+                body=request.body,
+                content_type=request.META.get("CONTENT_TYPE", "application/json"),
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
+
+    def delete(self, request, pk: int):
+        try:
+            status_code, payload = proxy_catalog_write(
+                method="DELETE",
+                path=f"/api/products/{pk}/",
+                body=b"",
+                content_type="application/json",
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(status=status_code)
+        except CatalogServiceError as exc:
+            return _catalog_error_response(exc)
+
+
+class OrderListProxyView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            status_code, payload = proxy_order_request(
+                method="GET",
+                path="/api/orders/",
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except OrderServiceError as exc:
+            return _order_error_response(exc)
+
+    def post(self, request):
+        try:
+            status_code, payload = proxy_order_request(
+                method="POST",
+                path="/api/orders/",
+                body=request.body,
+                content_type=request.META.get("CONTENT_TYPE", "application/json"),
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except OrderServiceError as exc:
+            return _order_error_response(exc)
+
+
+class OrderDetailProxyView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk: int):
+        try:
+            status_code, payload = proxy_order_request(
+                method="GET",
+                path=f"/api/orders/{pk}/",
+                authorization=request.headers.get("Authorization"),
+            )
+            return Response(payload, status=status_code)
+        except OrderServiceError as exc:
+            return _order_error_response(exc)
 
 
 class DemoPageView(TemplateView):

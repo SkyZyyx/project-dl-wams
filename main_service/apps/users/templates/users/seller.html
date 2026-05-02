@@ -59,6 +59,44 @@
 
         <div class="notice" id="seller-status" data-tone="info">Idle.</div>
         <div class="notice" id="seller-result" data-tone="info">No listing created yet.</div>
+    </div>
+
+    <div class="auth-panel panel auth-card">
+        <div class="auth-head">
+            <div>
+                <p class="card-label">Manage listings</p>
+                <h3>Edit or remove your own products.</h3>
+            </div>
+            <button id="reload-products" class="ghost-button" type="button">Reload</button>
+        </div>
+
+        <div class="notice" id="manage-status" data-tone="info">Loading your products...</div>
+        <div id="owned-products" class="form" style="gap: 12px;"></div>
+
+        <hr>
+        <form id="edit-form" class="form">
+            <input type="hidden" id="edit-product-id">
+            <div class="field">
+                <label for="edit-name">Product name</label>
+                <input class="input" id="edit-name" required>
+            </div>
+            <div class="field">
+                <label for="edit-description">Description</label>
+                <textarea class="input" id="edit-description" rows="3"></textarea>
+            </div>
+            <div class="field">
+                <label for="edit-price">Price (USD)</label>
+                <input class="input" id="edit-price" type="number" min="1" step="0.01" required>
+            </div>
+            <div class="field">
+                <label for="edit-category">Category ID</label>
+                <input class="input" id="edit-category" type="number" min="1" placeholder="Optional">
+            </div>
+            <div class="form-actions">
+                <button class="button" type="submit">Update product</button>
+                <button id="delete-product" class="ghost-button" type="button" disabled>Delete product</button>
+            </div>
+        </form>
 
         <hr>
         <div class="field">
@@ -109,11 +147,23 @@
             var form = document.getElementById("seller-form");
             var status = document.getElementById("seller-status");
             var result = document.getElementById("seller-result");
+            var manageStatus = document.getElementById("manage-status");
+            var ownedProducts = document.getElementById("owned-products");
+            var reloadProductsBtn = document.getElementById("reload-products");
+            var editForm = document.getElementById("edit-form");
+            var editProductId = document.getElementById("edit-product-id");
+            var editName = document.getElementById("edit-name");
+            var editDescription = document.getElementById("edit-description");
+            var editPrice = document.getElementById("edit-price");
+            var editCategory = document.getElementById("edit-category");
+            var deleteProductBtn = document.getElementById("delete-product");
             var imageInputs = document.getElementById("image-inputs");
             var addImageBtn = document.getElementById("add-image");
             var extraProductId = document.getElementById("extra-product-id");
             var extraImageFile = document.getElementById("extra-image-file");
             var extraUploadBtn = document.getElementById("extra-upload");
+            var sessionProfile = null;
+            var ownedList = [];
 
             function addImageField(required) {
                 var input = document.createElement("input");
@@ -128,6 +178,84 @@
                 return getToken();
             }
 
+            function selectedProduct() {
+                if (!sessionProfile || !editProductId.value) {
+                    return null;
+                }
+                return ownedList.find(function (product) {
+                    return String(product.id) === String(editProductId.value);
+                }) || null;
+            }
+
+            function clearEditor(message) {
+                editProductId.value = "";
+                editName.value = "";
+                editDescription.value = "";
+                editPrice.value = "";
+                editCategory.value = "";
+                deleteProductBtn.disabled = true;
+                if (message) {
+                    ui.setStatus(manageStatus, "info", "Select a product", message);
+                }
+            }
+
+            function fillEditor(product) {
+                if (!product) {
+                    clearEditor("Pick one of your listings to edit or delete.");
+                    return;
+                }
+                editProductId.value = String(product.id);
+                editName.value = product.name || "";
+                editDescription.value = product.description || "";
+                editPrice.value = product.price || "";
+                editCategory.value = product.category && product.category.id ? String(product.category.id) : "";
+                deleteProductBtn.disabled = false;
+                ui.setStatus(manageStatus, "info", "Editing product #" + product.id, "Only the owner can change this listing.");
+            }
+
+            function renderOwnedProducts(products) {
+                ownedProducts.innerHTML = "";
+                ownedList = products.slice();
+
+                if (!ownedList.length) {
+                    ownedProducts.innerHTML = "<div class='notice' data-tone='info'>No listings found for this account.</div>";
+                    clearEditor("Create a new listing above to get started.");
+                    return;
+                }
+
+                ownedList.forEach(function (product) {
+                    var card = ui.renderProductCard(product);
+                    var actions = document.createElement("div");
+                    actions.className = "form-actions";
+
+                    var editButton = document.createElement("button");
+                    editButton.type = "button";
+                    editButton.className = "button";
+                    editButton.textContent = "Edit";
+                    editButton.addEventListener("click", function () {
+                        fillEditor(product);
+                    });
+
+                    var deleteButton = document.createElement("button");
+                    deleteButton.type = "button";
+                    deleteButton.className = "ghost-button";
+                    deleteButton.textContent = "Delete";
+                    deleteButton.addEventListener("click", async function () {
+                        fillEditor(product);
+                        await removeSelectedProduct();
+                    });
+
+                    actions.appendChild(editButton);
+                    actions.appendChild(deleteButton);
+                    card.appendChild(actions);
+                    ownedProducts.appendChild(card);
+                });
+
+                if (!selectedProduct()) {
+                    fillEditor(ownedList[0]);
+                }
+            }
+
             async function ensureSeller() {
                 var t = token();
                 if (!t) {
@@ -136,10 +264,17 @@
                 }
                 try {
                     var profile = await ui.fetchJson("/api/auth/profile/", { headers: { Authorization: "Bearer " + t } });
+                    sessionProfile = profile;
                     setSession(t, normalizeRole(profile.role));
                     if (profile.role !== "seller" && profile.role !== "admin") {
                         ui.setStatus(status, "error", "Access denied", "Only seller/admin can create listings.");
                         return false;
+                    }
+                    if (typeof ui.updateNavLinks === "function") {
+                        ui.updateNavLinks();
+                    }
+                    if (typeof ui.updateRoleBadge === "function") {
+                        ui.updateRoleBadge();
                     }
                     return true;
                 } catch (error) {
@@ -153,9 +288,103 @@
                 }
             }
 
+            async function loadOwnedProducts() {
+                if (!(await ensureSeller())) {
+                    return;
+                }
+
+                ui.setStatus(manageStatus, "info", "Loading products", "Fetching your catalog entries.");
+                try {
+                    var products = await ui.loadCollection("/api/products/");
+                    var username = String(sessionProfile && sessionProfile.username || "").trim();
+                    var role = normalizeRole(sessionProfile && sessionProfile.role);
+                    var visible = role === "admin"
+                        ? products
+                        : products.filter(function (product) {
+                            return String(product.seller_username || "") === username;
+                        });
+                    renderOwnedProducts(visible);
+                    ui.setStatus(manageStatus, "success", "Listings loaded", visible.length + " product(s) ready to edit.");
+                } catch (error) {
+                    ui.setStatus(manageStatus, "error", "Load failed", error.message);
+                }
+            }
+
+            async function saveSelectedProduct(event) {
+                event.preventDefault();
+                var product = selectedProduct();
+                if (!product) {
+                    ui.setStatus(manageStatus, "error", "No product selected", "Pick one of your listings first.");
+                    return;
+                }
+
+                if (!(await ensureSeller())) {
+                    return;
+                }
+
+                var payload = {};
+                var name = String(editName.value || "").trim();
+                var description = String(editDescription.value || "").trim();
+                var price = String(editPrice.value || "").trim();
+                var category = String(editCategory.value || "").trim();
+
+                if (name) { payload.name = name; }
+                payload.description = description;
+                if (price) { payload.price = price; }
+                if (category) { payload.category_id = Number(category); }
+
+                ui.setStatus(manageStatus, "info", "Updating", "Saving changes to product #" + product.id + ".");
+                try {
+                    await ui.fetchJson("/api/products/" + encodeURIComponent(product.id) + "/", {
+                        method: "PATCH",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: "Bearer " + token()
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    ui.setStatus(manageStatus, "success", "Updated", "Product #" + product.id + " was saved.");
+                    await loadOwnedProducts();
+                } catch (error) {
+                    ui.setStatus(manageStatus, "error", "Update failed", error.message);
+                }
+            }
+
+            async function removeSelectedProduct() {
+                var product = selectedProduct();
+                if (!product) {
+                    ui.setStatus(manageStatus, "error", "No product selected", "Pick one of your listings first.");
+                    return;
+                }
+
+                if (!window.confirm("Delete product #" + product.id + "? This cannot be undone.")) {
+                    return;
+                }
+
+                if (!(await ensureSeller())) {
+                    return;
+                }
+
+                ui.setStatus(manageStatus, "info", "Deleting", "Removing product #" + product.id + ".");
+                try {
+                    await ui.fetchJson("/api/products/" + encodeURIComponent(product.id) + "/", {
+                        method: "DELETE",
+                        headers: { Authorization: "Bearer " + token() }
+                    });
+                    ui.setStatus(manageStatus, "success", "Deleted", "Product #" + product.id + " was removed.");
+                    await loadOwnedProducts();
+                } catch (error) {
+                    ui.setStatus(manageStatus, "error", "Delete failed", error.message);
+                }
+            }
+
             addImageBtn.addEventListener("click", function () {
                 addImageField(false);
             });
+
+            reloadProductsBtn.addEventListener("click", loadOwnedProducts);
+            editForm.addEventListener("submit", saveSelectedProduct);
+            deleteProductBtn.addEventListener("click", removeSelectedProduct);
 
             form.addEventListener("submit", async function (event) {
                 event.preventDefault();
@@ -194,6 +423,7 @@
                     form.reset();
                     imageInputs.innerHTML = "";
                     for (var i = 0; i < 5; i += 1) addImageField(true);
+                    await loadOwnedProducts();
                 } catch (error) {
                     ui.setStatus(status, "error", "Create failed", error.message);
                 }
@@ -233,7 +463,7 @@
 
             imageInputs.innerHTML = "";
             for (var i = 0; i < 5; i += 1) addImageField(true);
-            ensureSeller();
+            loadOwnedProducts();
         });
     })();
 </script>

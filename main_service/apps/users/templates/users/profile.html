@@ -51,6 +51,15 @@
                     var value = String(role || "").trim().toLowerCase();
                     return (value === "admin" || value === "seller" || value === "client") ? value : "";
                 };
+            var roleLabel = typeof ui.roleLabel === "function"
+                ? ui.roleLabel
+                : function (role) {
+                    var value = normalizeRole(role);
+                    if (value === "admin") {
+                        return "Access ALL";
+                    }
+                    return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+                };
             var isInvalidToken = typeof ui.isInvalidTokenMessage === "function"
                 ? ui.isInvalidTokenMessage
                 : function (message) {
@@ -76,7 +85,7 @@
                 metaEl.innerHTML = [
                     ["User ID", data.id],
                     ["Username", data.username],
-                    ["Role", data.role || "Unknown"],
+                    ["Role", roleLabel(data.role) || "Unknown"],
                     ["Email", data.email || "Not set"],
                     ["Name", [data.first_name, data.last_name].filter(Boolean).join(" ") || "Not set"]
                 ].map(function (pair) {

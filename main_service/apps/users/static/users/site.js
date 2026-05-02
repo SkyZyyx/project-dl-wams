@@ -248,6 +248,9 @@
         if (!value) {
             return "";
         }
+        if (value === "admin") {
+            return "Access ALL";
+        }
         return value.charAt(0).toUpperCase() + value.slice(1);
     }
 
@@ -481,6 +484,7 @@
         formatPrice: formatPrice,
         formatScore: formatScore,
         formatSimilarity: formatSimilarity,
+        roleLabel: roleLabel,
         imageSource: imageSource,
         productImages: productImages,
         renderProductCard: renderProductCard,

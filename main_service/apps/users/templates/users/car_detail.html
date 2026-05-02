@@ -11,7 +11,7 @@
             <p class="lede" id="car-detail-copy">Fetching images, specs, and the recommendation set for this listing.</p>
         </div>
         <div class="detail-hero-actions">
-            <a class="button" href="#car-detail-buy-form">Buy now</a>
+            <a class="button" id="car-detail-buy-link" href="#car-detail-buy-form" hidden>Buy now</a>
             <a class="ghost-button" href="/">Back to inventory</a>
             <span class="pill" id="car-detail-pill">Loading</span>
         </div>
@@ -36,7 +36,7 @@
                 <p class="panel-copy" id="car-detail-description">Loading description.</p>
             </section>
 
-            <section class="panel">
+            <section class="panel" id="car-detail-buy-panel" hidden>
                 <div class="panel-head">
                     <div>
                         <p class="card-label">Buy now</p>
@@ -46,7 +46,7 @@
                 <form class="checkout-strip" id="car-detail-buy-form">
                     <label class="field"><span>Name</span><input class="input" name="name" required></label>
                     <label class="field"><span>Email</span><input class="input" name="email" type="email" required></label>
-                    <button class="button" type="submit">Buy now</button>
+                    <button class="button" id="car-detail-buy-button" type="submit">Buy now</button>
                     <div class="notice" id="car-detail-buy-status" data-tone="info">Ready when you are.</div>
                 </form>
             </section>
@@ -86,6 +86,8 @@
             var similarCount = document.getElementById("car-detail-similar-count");
             var similarStatus = document.getElementById("car-detail-similar-status");
             var buyForm = document.getElementById("car-detail-buy-form");
+            var buyPanel = document.getElementById("car-detail-buy-panel");
+            var buyLink = document.getElementById("car-detail-buy-link");
             var buyStatus = document.getElementById("car-detail-buy-status");
 
             function renderPrimaryMedia(images, activeIndex) {
@@ -189,9 +191,48 @@
                 }
             }
 
-            buyForm.addEventListener("submit", function (event) {
+            function updateBuyVisibility() {
+                var token = ui.getAuthToken ? ui.getAuthToken() : "";
+                var role = ui.getStoredRole ? ui.getStoredRole() : "";
+                var canBuy = !!token && role === "client";
+
+                buyPanel.hidden = !canBuy;
+                buyLink.hidden = !canBuy;
+
+                if (role === "seller" || role === "admin") {
+                    ui.setStatus(buyStatus, "info", "Seller mode", "Seller and admin accounts cannot buy cars. Use a client account to place orders.");
+                } else if (!token) {
+                    ui.setStatus(buyStatus, "info", "Client login required", "Sign in as a client to buy this car.");
+                }
+            }
+
+            window.addEventListener("wams:session-changed", updateBuyVisibility);
+            updateBuyVisibility();
+
+            buyForm.addEventListener("submit", async function (event) {
+                var token = ui.getAuthToken ? ui.getAuthToken() : "";
+                var role = ui.getStoredRole ? ui.getStoredRole() : "";
                 event.preventDefault();
-                ui.setStatus(buyStatus, "success", "Purchase request captured", "Apex Motors demo checkout is ready for the next backend step.");
+
+                if (!token || role !== "client") {
+                    updateBuyVisibility();
+                    return;
+                }
+
+                ui.setStatus(buyStatus, "info", "Creating order", "Submitting this car to checkout.");
+                try {
+                    await ui.fetchJson("/api/orders/", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": "Bearer " + token
+                        },
+                        body: JSON.stringify({ items: [{ product_id: Number(carId), quantity: 1 }] })
+                    });
+                    ui.setStatus(buyStatus, "success", "Order placed", "Your purchase request was saved.");
+                } catch (error) {
+                    ui.setStatus(buyStatus, "error", "Order failed", error.message);
+                }
             });
 
             ui.fetchProductById(carId)
