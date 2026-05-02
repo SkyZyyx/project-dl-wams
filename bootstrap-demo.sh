@@ -14,8 +14,8 @@ wait_for_url() {
 printf 'Starting stack...\n'
 docker compose up -d --build
 
-wait_for_url "http://localhost:8002/api/health/" "product_service"
-wait_for_url "http://localhost:8004/api/health/" "search_service"
+wait_for_url "http://localhost:8002/api/ready/" "product_service"
+wait_for_url "http://localhost:8004/api/ready/" "search_service"
 
 printf 'Seeding demo products...\n'
 docker compose exec -T product_service python manage.py seed_demo

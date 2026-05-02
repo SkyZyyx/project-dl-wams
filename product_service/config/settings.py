@@ -8,14 +8,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-product-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv(
-        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,productservice,nginx"
-    ).split(",")
-    if host.strip()
-]
-ALLOWED_HOSTS += [host for host in ("testserver", "productservice") if host not in ALLOWED_HOSTS]
+def _allowed_hosts(default_hosts: str, *extras: str) -> list[str]:
+    hosts = [host.strip() for host in default_hosts.split(",") if host.strip()]
+    for host in extras:
+        if host and host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
+ALLOWED_HOSTS = _allowed_hosts(
+    os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,productservice,nginx"),
+    "testserver",
+    "productservice",
+    "searchservice",
+    "mainservice",
+    "userservice",
+    "orderservice",
+    "nginx",
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -83,7 +93,8 @@ MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://searchservice:8004")
-SEARCH_SERVICE_TIMEOUT_SECONDS = float(os.getenv("SEARCH_SERVICE_TIMEOUT_SECONDS", "10"))
+SEARCH_SERVICE_HOST_HEADER = os.getenv("SEARCH_SERVICE_HOST_HEADER", "localhost")
+SEARCH_SERVICE_TIMEOUT_SECONDS = float(os.getenv("SEARCH_SERVICE_TIMEOUT_SECONDS", "180"))
 JWT_SIGNING_KEY = os.getenv("JWT_SIGNING_KEY", SECRET_KEY)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

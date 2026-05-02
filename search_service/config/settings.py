@@ -7,16 +7,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-search-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 
+def _allowed_hosts(default_hosts: str, *extras: str) -> list[str]:
+    hosts = [host.strip() for host in default_hosts.split(",") if host.strip()]
+    for host in extras:
+        if host and host not in hosts:
+            hosts.append(host)
+    return hosts
+
+
 if DEBUG:
     ALLOWED_HOSTS = ["*"]
 else:
-    ALLOWED_HOSTS = [
-        host.strip()
-        for host in os.getenv(
-            "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,searchservice,nginx"
-        ).split(",")
-        if host.strip()
-    ]
+    ALLOWED_HOSTS = _allowed_hosts(
+        os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,searchservice,nginx"),
+        "searchservice",
+        "mainservice",
+        "productservice",
+        "userservice",
+        "orderservice",
+        "nginx",
+    )
 
 INSTALLED_APPS = [
     "django.contrib.admin",

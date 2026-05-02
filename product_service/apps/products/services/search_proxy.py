@@ -9,19 +9,29 @@ from django.conf import settings
 
 
 class SearchServiceError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def _error_detail(exc: Exception, fallback: str) -> str:
     if isinstance(exc, urllib_error.HTTPError):
+        body = ""
         try:
-            payload = json.loads(exc.read().decode("utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            payload = {}
-        detail = payload.get("detail") if isinstance(payload, dict) else None
-        if detail:
-            return f"{fallback}: {detail}"
+            body = exc.read().decode("utf-8", errors="replace").strip()
+        except Exception:
+            body = ""
+        if body:
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError:
+                return f"{fallback}: HTTP {exc.code}: {body[:500]}"
+            detail = payload.get("detail") if isinstance(payload, dict) else None
+            if detail:
+                return f"{fallback}: {detail}"
         return f"{fallback}: HTTP {exc.code}"
+    if isinstance(exc, urllib_error.URLError):
+        return f"{fallback}: {exc.reason}"
     return fallback
 
 
@@ -51,7 +61,9 @@ def _multipart_body(fields: dict[str, str], files: dict[str, tuple[str, bytes, s
 
 
 def _json_request(method: str, url: str, *, body: bytes | None = None, headers: dict[str, str] | None = None):
-    request = urllib_request.Request(url, data=body, headers=headers or {}, method=method)
+    request_headers = {"Host": settings.SEARCH_SERVICE_HOST_HEADER}
+    request_headers.update(headers or {})
+    request = urllib_request.Request(url, data=body, headers=request_headers, method=method)
     with urllib_request.urlopen(request, timeout=settings.SEARCH_SERVICE_TIMEOUT_SECONDS) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -70,7 +82,8 @@ def index_product_image(*, product_id: int, product_image_id: int, image_name: s
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"},
         )
     except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
-        raise SearchServiceError(_error_detail(exc, "index request failed")) from exc
+        status_code = exc.code if isinstance(exc, urllib_error.HTTPError) else None
+        raise SearchServiceError(_error_detail(exc, "index request failed"), status_code=status_code) from exc
 
 
 def delete_product_index(product_id: int) -> dict:
@@ -78,4 +91,5 @@ def delete_product_index(product_id: int) -> dict:
     try:
         return _json_request("DELETE", url, headers={"Accept": "application/json"})
     except (urllib_error.HTTPError, urllib_error.URLError, json.JSONDecodeError) as exc:
-        raise SearchServiceError(_error_detail(exc, "delete request failed")) from exc
+        status_code = exc.code if isinstance(exc, urllib_error.HTTPError) else None
+        raise SearchServiceError(_error_detail(exc, "delete request failed"), status_code=status_code) from exc

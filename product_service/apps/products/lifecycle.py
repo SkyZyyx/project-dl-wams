@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from time import sleep
 
 from .models import ProductImage
 from .services.search_proxy import SearchServiceError, delete_product_index, index_product_image
@@ -31,8 +32,28 @@ def _index_image(image: ProductImage):
     ProductImage.objects.filter(pk=image.pk).update(indexed=True, qdrant_id=response.get("qdrant_id"))
 
 
-def index_product_image_record(image: ProductImage):
-    _index_image(image)
+def index_product_image_record(image: ProductImage, *, retries: int = 3, retry_delay_seconds: float = 1.5):
+    last_error: SearchServiceError | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            _index_image(image)
+            return
+        except SearchServiceError as exc:
+            last_error = exc
+            should_retry = exc.status_code is None or exc.status_code >= 500
+            if not should_retry or attempt >= retries:
+                raise
+            logger.warning(
+                "Search service not ready for product image %s (attempt %s/%s): %s",
+                image.pk,
+                attempt,
+                retries,
+                exc,
+            )
+            sleep(retry_delay_seconds * attempt)
+
+    if last_error is not None:
+        raise last_error
 
 
 def refresh_product_image_vectors(product_id: int):
@@ -41,7 +62,7 @@ def refresh_product_image_vectors(product_id: int):
         for image in ProductImage.objects.filter(product_id=product_id).select_related("product"):
             if not image.image:
                 continue
-            _index_image(image)
+            index_product_image_record(image)
     except SearchServiceError:
         log_search_unavailable_once("refresh", "Search service unavailable; skipped vector refresh after image delete")
 

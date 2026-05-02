@@ -93,7 +93,7 @@ services:
   main_service:
     build:
       context: ./main_service
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "until python -c 'import os,socket; s=socket.socket(); s.settimeout(1); s.connect((os.getenv(\"POSTGRES_HOST\", \"postgres_main\"), int(os.getenv(\"POSTGRES_PORT\", \"5432\")))); s.close()'; do echo waiting for postgres_main; sleep 2; done; python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     environment:
       DJANGO_SECRET_KEY: ${MAIN_DJANGO_SECRET_KEY:-dev-main-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
@@ -127,7 +127,7 @@ services:
   user_service:
     build:
       context: ./user_service
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8001"
+    command: sh -c "until python -c 'import os,socket; s=socket.socket(); s.settimeout(1); s.connect((os.getenv(\"POSTGRES_HOST\", \"postgres_users\"), int(os.getenv(\"POSTGRES_PORT\", \"5432\")))); s.close()'; do echo waiting for postgres_users; sleep 2; done; python manage.py migrate && python manage.py runserver 0.0.0.0:8001"
     environment:
       DJANGO_SECRET_KEY: ${USER_DJANGO_SECRET_KEY:-dev-user-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
@@ -155,7 +155,7 @@ services:
   product_service:
     build:
       context: ./product_service
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8002"
+    command: sh -c "until python -c 'import os,socket; s=socket.socket(); s.settimeout(1); s.connect((os.getenv(\"POSTGRES_HOST\", \"postgres_products\"), int(os.getenv(\"POSTGRES_PORT\", \"5432\")))); s.close()'; do echo waiting for postgres_products; sleep 2; done; python manage.py migrate && python manage.py runserver 0.0.0.0:8002"
     environment:
       DJANGO_SECRET_KEY: ${PRODUCT_DJANGO_SECRET_KEY:-dev-product-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
@@ -167,7 +167,8 @@ services:
       POSTGRES_HOST: postgres_products
       POSTGRES_PORT: 5432
       SEARCH_SERVICE_URL: ${SEARCH_SERVICE_URL:-http://searchservice:8004}
-      SEARCH_SERVICE_TIMEOUT_SECONDS: ${SEARCH_SERVICE_TIMEOUT_SECONDS:-10}
+      SEARCH_SERVICE_HOST_HEADER: ${SEARCH_SERVICE_HOST_HEADER:-localhost}
+      SEARCH_SERVICE_TIMEOUT_SECONDS: ${SEARCH_SERVICE_TIMEOUT_SECONDS:-180}
       MEDIA_ROOT: /app/media
       MEDIA_URL: /media/
       KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
@@ -188,7 +189,7 @@ services:
   order_service:
     build:
       context: ./order_service
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8003"
+    command: sh -c "until python -c 'import os,socket; s=socket.socket(); s.settimeout(1); s.connect((os.getenv(\"POSTGRES_HOST\", \"postgres_orders\"), int(os.getenv(\"POSTGRES_PORT\", \"5432\")))); s.close()'; do echo waiting for postgres_orders; sleep 2; done; python manage.py migrate && python manage.py runserver 0.0.0.0:8003"
     environment:
       DJANGO_SECRET_KEY: ${ORDER_DJANGO_SECRET_KEY:-dev-order-secret}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
@@ -216,7 +217,7 @@ services:
   search_service:
     build:
       context: ./search_service
-    command: sh -c "python manage.py migrate && exec gunicorn config.wsgi:application --bind 0.0.0.0:8004 --workers 1 --threads 4"
+    command: sh -c "until python -c 'import os,socket; s=socket.socket(); s.settimeout(1); s.connect((os.getenv(\"POSTGRES_HOST\", \"postgres_search\"), int(os.getenv(\"POSTGRES_PORT\", \"5432\")))); s.close()'; do echo waiting for postgres_search; sleep 2; done; python manage.py migrate && exec gunicorn config.wsgi:application --bind 0.0.0.0:8004 --workers 1 --threads 4 --timeout 300"
     environment:
       DJANGO_SECRET_KEY: ${SEARCH_DJANGO_SECRET_KEY:-dev-search-secret}
       DJANGO_DEBUG: ${SEARCH_DJANGO_DEBUG:-0}
@@ -265,6 +266,10 @@ services:
     image: nginx:1.27-alpine
     depends_on:
       - main_service
+      - user_service
+      - product_service
+      - order_service
+      - search_service
     ports:
       - "8080:80"
     volumes:
