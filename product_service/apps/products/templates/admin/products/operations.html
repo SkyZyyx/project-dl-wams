@@ -116,7 +116,7 @@
             <tr>
               <td>#{{ product.id }}</td>
               <td>{{ product.name }}</td>
-              <td>{{ product.category.name }}</td>
+              <td>{{ product.category.name|default:"—" }}</td>
               <td>{{ product.price }}</td>
               <td>
                 <form method="post" class="inline-form">

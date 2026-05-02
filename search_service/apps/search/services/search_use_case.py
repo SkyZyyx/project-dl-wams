@@ -9,7 +9,7 @@ from .embedder import get_embedder
 from .model_registry import get_default_model_id
 from .preprocess import preprocess_image_bytes
 from .quality import validate_image_quality
-from .qdrant import search_vectors, upsert_vector
+from .qdrant import QdrantServiceError, search_vectors, upsert_vector
 from .qdrant_policy import (
     get_search_thresholds,
     is_query_vector_out_of_distribution,
@@ -65,12 +65,16 @@ def index_image(*, image_bytes: bytes, image_name: str, product_id: int, product
     embed_ms = (perf_counter() - embed_started) * 1000
     vector_id = product_image_id if product_image_id is not None else str(uuid4())
     upsert_started = perf_counter()
-    upsert_vector(
-        vector_id=vector_id,
-        vector=vector,
-        payload={"product_id": product_id, "product_image_id": product_image_id, "filename": image_name},
-        model_id=model_id,
-    )
+    try:
+        upsert_vector(
+            vector_id=vector_id,
+            vector=vector,
+            payload={"product_id": product_id, "product_image_id": product_image_id, "filename": image_name},
+            model_id=model_id,
+        )
+    except QdrantServiceError as exc:
+        logger.warning("index qdrant unavailable model=%s product_id=%s error=%s", model_id, product_id, exc)
+        return UseCaseResponse({"detail": "vector database unavailable"}, status.HTTP_503_SERVICE_UNAVAILABLE)
     total_ms = (perf_counter() - started_at) * 1000
     logger.info(
         "index completed model=%s product_id=%s product_image_id=%s vector_id=%s preprocess_ms=%.1f embed_ms=%.1f upsert_ms=%.1f total_ms=%.1f",
@@ -112,7 +116,12 @@ def search_image(*, image_bytes: bytes, limit: int = 10, score_threshold: float 
     embed_ms = (perf_counter() - embed_started) * 1000
 
     ood_started = perf_counter()
-    if is_query_vector_out_of_distribution(vector=vector, model_id=model_id):
+    try:
+        is_ood = is_query_vector_out_of_distribution(vector=vector, model_id=model_id)
+    except QdrantServiceError as exc:
+        logger.warning("search qdrant unavailable during ood check model=%s error=%s", model_id, exc)
+        return UseCaseResponse({"detail": "vector database unavailable", "matches": []}, status.HTTP_503_SERVICE_UNAVAILABLE)
+    if is_ood:
         logger.info(
             "search ood model=%s limit=%s threshold=%s preprocess_ms=%.1f embed_ms=%.1f ood_ms=%.1f total_ms=%.1f",
             model_id,
@@ -126,7 +135,11 @@ def search_image(*, image_bytes: bytes, limit: int = 10, score_threshold: float 
         return UseCaseResponse({"detail": "no similar products found", "matches": []}, status.HTTP_200_OK)
 
     search_started = perf_counter()
-    results = search_vectors(vector=vector, limit=limit, score_threshold=score_threshold, model_id=model_id)
+    try:
+        results = search_vectors(vector=vector, limit=limit, score_threshold=score_threshold, model_id=model_id)
+    except QdrantServiceError as exc:
+        logger.warning("search qdrant unavailable model=%s limit=%s error=%s", model_id, limit, exc)
+        return UseCaseResponse({"detail": "vector database unavailable", "matches": []}, status.HTTP_503_SERVICE_UNAVAILABLE)
     search_ms = (perf_counter() - search_started) * 1000
     if is_top_hit_below_ood_threshold(results=results, model_id=model_id):
         logger.info(

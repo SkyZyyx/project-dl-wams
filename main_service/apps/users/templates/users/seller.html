@@ -41,15 +41,9 @@
                 <label for="seller-description">Description</label>
                 <textarea class="input" id="seller-description" name="description" rows="3"></textarea>
             </div>
-            <div class="grid-2" style="gap: 14px;">
-                <div class="field">
-                    <label for="seller-price">Price (USD)</label>
-                    <input class="input" id="seller-price" name="price" type="number" min="1" step="0.01" required>
-                </div>
-                <div class="field">
-                    <label for="seller-category">Category</label>
-                    <select class="input" id="seller-category" name="category_id" required></select>
-                </div>
+            <div class="field">
+                <label for="seller-price">Price (USD)</label>
+                <input class="input" id="seller-price" name="price" type="number" min="1" step="0.01" required>
             </div>
 
             <div class="field">
@@ -117,7 +111,6 @@
             var result = document.getElementById("seller-result");
             var imageInputs = document.getElementById("image-inputs");
             var addImageBtn = document.getElementById("add-image");
-            var categorySelect = document.getElementById("seller-category");
             var extraProductId = document.getElementById("extra-product-id");
             var extraImageFile = document.getElementById("extra-image-file");
             var extraUploadBtn = document.getElementById("extra-upload");
@@ -160,24 +153,6 @@
                 }
             }
 
-            async function loadCategories() {
-                try {
-                    var categories = await ui.fetchJson("/api/products/categories/");
-                    categorySelect.innerHTML = "";
-                    (categories || []).forEach(function (category) {
-                        var option = document.createElement("option");
-                        option.value = String(category.id);
-                        option.textContent = category.name;
-                        categorySelect.appendChild(option);
-                    });
-                    if (!categories || !categories.length) {
-                        ui.setStatus(status, "error", "No categories", "Create categories first.");
-                    }
-                } catch (error) {
-                    ui.setStatus(status, "error", "Category load failed", error.message);
-                }
-            }
-
             addImageBtn.addEventListener("click", function () {
                 addImageField(false);
             });
@@ -199,7 +174,6 @@
                 payload.append("name", document.getElementById("seller-name").value);
                 payload.append("description", document.getElementById("seller-description").value);
                 payload.append("price", document.getElementById("seller-price").value);
-                payload.append("category_id", categorySelect.value);
                 files.forEach(function (file) { payload.append("image_files", file); });
 
                 ui.setStatus(status, "info", "Creating", "Posting product + images...");
@@ -260,7 +234,6 @@
             imageInputs.innerHTML = "";
             for (var i = 0; i < 5; i += 1) addImageField(true);
             ensureSeller();
-            loadCategories();
         });
     })();
 </script>

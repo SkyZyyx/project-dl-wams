@@ -47,7 +47,6 @@ class ProductPermissionTests(TestCase):
 
 class ProductSerializerTests(TestCase):
     def test_create_sets_seller_from_token_username_when_user_username_empty(self):
-        category = Category.objects.create(name="SUV", slug="suv")
         request = APIRequestFactory().post("/api/products/", {"name": "x"}, format="json")
         request.user = _FakeUser(role="seller", username="", token={"role": "seller", "username": "seller-token"})
         serializer = ProductSerializer(context={"request": request})
@@ -57,9 +56,9 @@ class ProductSerializerTests(TestCase):
                 "name": "Land Rover",
                 "description": "desc",
                 "price": Decimal("999.99"),
-                "category": category,
                 "image_files": [],
             }
         )
 
         self.assertEqual(product.seller_username, "seller-token")
+        self.assertIsNone(product.category)

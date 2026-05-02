@@ -94,6 +94,7 @@ MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+QDRANT_HTTP_TIMEOUT = float(os.getenv("QDRANT_HTTP_TIMEOUT", "5"))
 MAIN_SERVICE_URL = os.getenv("MAIN_SERVICE_URL", "http://mainservice:8000")
 DEFAULT_SEARCH_MODEL = os.getenv("DEFAULT_SEARCH_MODEL", "dinov2_base_pretrained")
 DINOV2_PRETRAINED_SOURCE = os.getenv("DINOV2_PRETRAINED_SOURCE", os.getenv("DINOv2_PRETRAINED_SOURCE", "facebook/dinov2-base"))
@@ -114,8 +115,10 @@ DINOV2_TRIPLET_FINETUNED_VECTOR_SIZE = int(
 )
 CLIP_VIT_B32_SOURCE = os.getenv("CLIP_VIT_B32_SOURCE", "openai/clip-vit-base-patch32")
 CLIP_VIT_B32_CHECKPOINT_PATH = os.getenv("CLIP_VIT_B32_CHECKPOINT_PATH", "")
-SEARCH_OOD_COSINE_THRESHOLD = float(os.getenv("SEARCH_OOD_COSINE_THRESHOLD", "0.25"))
-SEARCH_OOD_TOP_SCORE_THRESHOLD = float(os.getenv("SEARCH_OOD_TOP_SCORE_THRESHOLD", "0.35"))
+SEARCH_MIN_SCORE_THRESHOLD = float(os.getenv("SEARCH_MIN_SCORE_THRESHOLD", "0.45"))
+# Negative/zero OOD thresholds disable these gates. For fine-tuned retrieval, returning nearest matches is safer than rejecting indexed-looking queries as OOD.
+SEARCH_OOD_COSINE_THRESHOLD = float(os.getenv("SEARCH_OOD_COSINE_THRESHOLD", "-1"))
+SEARCH_OOD_TOP_SCORE_THRESHOLD = float(os.getenv("SEARCH_OOD_TOP_SCORE_THRESHOLD", "0"))
 SEARCH_COLLECTION_SCROLL_LIMIT = int(os.getenv("SEARCH_COLLECTION_SCROLL_LIMIT", "256"))
 
 SEARCH_PREPROCESS_ENABLED = os.getenv("SEARCH_PREPROCESS_ENABLED", "1") == "1"

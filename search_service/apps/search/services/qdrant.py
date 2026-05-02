@@ -1,5 +1,6 @@
 import json
 from types import SimpleNamespace
+from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from django.conf import settings
@@ -10,11 +11,15 @@ from .model_registry import get_model_spec
 from functools import lru_cache
 
 
+class QdrantServiceError(RuntimeError):
+    pass
+
+
 @lru_cache(maxsize=1)
 def get_client():
     from qdrant_client import QdrantClient
 
-    return QdrantClient(url=settings.QDRANT_URL)
+    return QdrantClient(url=settings.QDRANT_URL, timeout=getattr(settings, "QDRANT_HTTP_TIMEOUT", 5))
 
 
 @lru_cache(maxsize=1)
@@ -33,30 +38,38 @@ def _vector_size(model_id: str | None = None) -> int:
 
 
 def ensure_collection(model_id: str | None = None) -> None:
-    client = get_client()
-    collection_name = _collection_name(model_id)
-    if hasattr(client, "collection_exists"):
-        exists = client.collection_exists(collection_name)
-    else:
-        exists = collection_name in {collection.name for collection in client.get_collections().collections}
+    try:
+        client = get_client()
+        collection_name = _collection_name(model_id)
+        if hasattr(client, "collection_exists"):
+            exists = client.collection_exists(collection_name)
+        else:
+            exists = collection_name in {collection.name for collection in client.get_collections().collections}
 
-    if exists:
-        return
+        if exists:
+            return
 
-    qmodels = get_models()
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config=qmodels.VectorParams(size=_vector_size(model_id), distance=qmodels.Distance.COSINE),
-    )
+        qmodels = get_models()
+        client.create_collection(
+            collection_name=collection_name,
+            vectors_config=qmodels.VectorParams(size=_vector_size(model_id), distance=qmodels.Distance.COSINE),
+        )
+    except Exception as exc:
+        if isinstance(exc, QdrantServiceError):
+            raise
+        raise QdrantServiceError("qdrant collection unavailable") from exc
 
 
 def upsert_vector(*, vector_id: int | str, vector: list[float], payload: dict, model_id: str | None = None) -> None:
     ensure_collection(model_id)
     qmodels = get_models()
-    get_client().upsert(
-        collection_name=_collection_name(model_id),
-        points=[qmodels.PointStruct(id=vector_id, vector=vector, payload=payload)],
-    )
+    try:
+        get_client().upsert(
+            collection_name=_collection_name(model_id),
+            points=[qmodels.PointStruct(id=vector_id, vector=vector, payload=payload)],
+        )
+    except Exception as exc:
+        raise QdrantServiceError("qdrant upsert unavailable") from exc
     from .qdrant_policy import clear_collection_mean_vector_cache
 
     clear_collection_mean_vector_cache(model_id)
@@ -74,12 +87,15 @@ def search_vectors(*, vector: list[float], limit: int = 5, score_threshold: floa
         payload["score_threshold"] = score_threshold
 
     request = urllib_request.Request(
-        f"{settings.QDRANT_URL}/collections/{_collection_name(model_id)}/points/search",
+        f"{settings.QDRANT_URL.rstrip('/')}/collections/{_collection_name(model_id)}/points/search",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
-    with urllib_request.urlopen(request, timeout=30) as response:
-        data = json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib_request.urlopen(request, timeout=getattr(settings, "QDRANT_HTTP_TIMEOUT", 5)) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except (TimeoutError, urllib_error.URLError, urllib_error.HTTPError) as exc:
+        raise QdrantServiceError("qdrant search unavailable") from exc
 
     return [
         SimpleNamespace(id=item.get("id"), score=item.get("score"), payload=item.get("payload") or {})

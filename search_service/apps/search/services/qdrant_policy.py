@@ -21,19 +21,13 @@ def _cache_key(model_id: str | None = None) -> str:
 def get_search_thresholds(model_id: str | None = None) -> dict[str, float]:
     spec = get_model_spec(model_id)
     thresholds = {
-        "min_score": 0.45,
-        "ood_top_score": 0.32,
-        "ood_cosine": 0.20,
+        "min_score": float(getattr(settings, "SEARCH_MIN_SCORE_THRESHOLD", 0.45)),
+        "ood_top_score": float(getattr(settings, "SEARCH_OOD_TOP_SCORE_THRESHOLD", 0.0)),
+        "ood_cosine": float(getattr(settings, "SEARCH_OOD_COSINE_THRESHOLD", -1.0)),
     }
 
-    if spec.family == "clip":
-        thresholds.update(
-            {
-                "min_score": 0.42,
-                "ood_top_score": 0.30,
-                "ood_cosine": 0.18,
-            }
-        )
+    if spec.family == "clip" and not hasattr(settings, "SEARCH_MIN_SCORE_THRESHOLD"):
+        thresholds["min_score"] = 0.42
 
     overrides = getattr(settings, "SEARCH_THRESHOLD_OVERRIDES", {})
     if isinstance(overrides, dict):
@@ -121,6 +115,10 @@ def get_collection_mean_vector(model_id: str | None = None) -> list[float] | Non
 
 
 def is_query_vector_out_of_distribution(*, vector: list[float], model_id: str | None = None) -> bool:
+    threshold = get_search_thresholds(model_id)["ood_cosine"]
+    if threshold < 0:
+        return False
+
     mean_vector = get_collection_mean_vector(model_id)
     if mean_vector is None:
         return False
@@ -130,12 +128,16 @@ def is_query_vector_out_of_distribution(*, vector: list[float], model_id: str | 
         return False
 
     cosine_similarity = sum(left * right for left, right in zip(normalized_vector, mean_vector))
-    return cosine_similarity < get_search_thresholds(model_id)["ood_cosine"]
+    return cosine_similarity < threshold
 
 
 def is_top_hit_below_ood_threshold(*, results, model_id: str | None = None) -> bool:
     if not results:
         return True
 
+    threshold = get_search_thresholds(model_id)["ood_top_score"]
+    if threshold <= 0:
+        return False
+
     top_score = max(float(getattr(result, "score", 0.0)) for result in results)
-    return top_score < get_search_thresholds(model_id)["ood_top_score"]
+    return top_score < threshold

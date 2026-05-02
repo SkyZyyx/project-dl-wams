@@ -165,7 +165,7 @@
                 ui.setStatus(similarStatus, "info", "Loading recommendations", "Running a visual top-5 retrieval query from this car.");
                 try {
                     queryFile = await fileFromProduct(product);
-                    payload = await ui.searchWithImage(queryFile, 0.45, 5);
+                    payload = await ui.searchWithImage(queryFile, 0.0, 5);
                     recommendations = (payload.matches || []).filter(function (item) {
                         return String(item.id) !== String(product.id);
                     }).slice(0, 5);
